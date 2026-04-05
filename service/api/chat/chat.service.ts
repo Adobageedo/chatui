@@ -27,10 +27,49 @@ export class ChatService {
   }
 
   /**
+   * Build system prompt with email context
+   */
+  private buildEmailSystemPrompt(emailContext: any): string {
+    const parts: string[] = [
+      "You are an AI assistant helping with email composition and management.",
+      "\n## Current Email Context:",
+    ];
+
+    if (emailContext.subject) {
+      parts.push(`**Subject:** ${emailContext.subject}`);
+    }
+    if (emailContext.from) {
+      parts.push(`**From:** ${emailContext.from}`);
+    }
+    if (emailContext.to) {
+      parts.push(`**To:** ${emailContext.to}`);
+    }
+    if (emailContext.cc) {
+      parts.push(`**CC:** ${emailContext.cc}`);
+    }
+    if (emailContext.date) {
+      parts.push(`**Date:** ${new Date(emailContext.date).toLocaleString()}`);
+    }
+    if (emailContext.body) {
+      parts.push(`\n**Email Body:**\n${emailContext.body}`);
+    }
+    if (emailContext.fullConversation) {
+      parts.push(`\n**Full Conversation:**\n${emailContext.fullConversation}`);
+    }
+
+    parts.push(
+      "\n---",
+      "Use this email context to help the user compose replies, analyze the email, or perform related tasks."
+    );
+
+    return parts.join("\n");
+  }
+
+  /**
    * Convert assistant-ui messages to AI SDK format
    */
-  private convertMessages(messages: ChatRequest["messages"]) {
-    return messages.map((msg) => {
+  private convertMessages(messages: ChatRequest["messages"], emailContext?: any) {
+    const convertedMessages = messages.map((msg) => {
       const content = msg.content || [];
 
       // Extract text content
@@ -44,6 +83,17 @@ export class ChatService {
         content: textContent || "",
       };
     });
+
+    // Inject email context as system message if present
+    if (emailContext && Object.keys(emailContext).length > 0) {
+      const systemPrompt = this.buildEmailSystemPrompt(emailContext);
+      convertedMessages.unshift({
+        role: "system",
+        content: systemPrompt,
+      });
+    }
+
+    return convertedMessages;
   }
 
   /**
@@ -77,18 +127,35 @@ export class ChatService {
   async streamChat(request: ChatRequest, options: ChatStreamOptions = {}) {
     this.validateRequest(request);
 
-    const aiMessages = this.convertMessages(request.messages);
-    const model = options.model || this.defaultModel;
+    const aiMessages = this.convertMessages(request.messages, options.emailContext);
+    
+    // Use reasoning model (o1-mini) when reasoning is enabled
+    // Otherwise use the default or specified model
+    const model = options.reasoningEnabled 
+      ? "gpt-5-nano" 
+      : (options.model || this.defaultModel);
 
     const result = streamText({
       model: openai(model),
       messages: aiMessages,
       stopWhen: stepCountIs(options.maxSteps || this.maxSteps),
       temperature: options.temperature,
-      tools: this.getTools(),
+      // Note: o1 models don't support tools, so only include if not using reasoning
+      ...(options.reasoningEnabled ? {} : { tools: this.getTools() }),
+      // Add reasoning-specific provider options
+      ...(options.reasoningEnabled ? {
+        providerOptions: {
+          openai: {
+            reasoningEffort: "low",
+            reasoningSummary: "auto",
+          },
+        },
+      } : {}),
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      ...(options.reasoningEnabled ? { sendReasoning: true } : {}),
+    });
   }
 }
 

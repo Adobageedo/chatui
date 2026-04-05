@@ -15,9 +15,9 @@ export const SUGGESTIONS_CONFIG = [
     prompt: "Donne-moi un résumé du dernier bail",
   },
   {
-    title: "Rechercher des locataires",
-    label: "Mes locataires",
-    prompt: "Liste tous mes locataires",
+    title: "Reasoning",
+    label: "Reasoning",
+    prompt: "Utilise et test le reasoning pour écrire une lettre de démission",
   },
   {
     title: "Date du jour",

@@ -5,6 +5,7 @@ import {
 } from "@/components/assistant-ui/attachment";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
+import { ReasoningDisplay } from "@/components/assistant-ui/reasoning-display";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,8 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import type { FC } from "react";
+import { type FC } from "react";
+import { ReasoningToggle } from "@/components/ui/reasoning-toggle";
 
 export const Thread: FC = () => {
   return (
@@ -158,7 +160,10 @@ const Composer: FC = () => {
 const ComposerAction: FC = () => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
+      <div className="flex items-center gap-1">
+        <ComposerAddAttachment />
+        <ReasoningToggle />
+      </div>
       <AuiIf condition={(s) => !s.thread.isRunning}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
@@ -211,6 +216,10 @@ const AssistantMessage: FC = () => {
         <MessagePrimitive.Parts>
           {({ part }) => {
             if (part.type === "text") return <MarkdownText />;
+            if (part.type === "reasoning") {
+              const isStreaming = part.status?.type === "running";
+              return <ReasoningDisplay text={part.text} isStreaming={isStreaming} />;
+            }
             if (part.type === "tool-call")
               return part.toolUI ?? <ToolFallback {...part} />;
             return null;

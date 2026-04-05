@@ -13,6 +13,7 @@ import { chatModelAdapter } from "@/lib/chat/chat-model-adapter";
 import { attachmentAdapter } from "@/lib/chat/attachment-adapter";
 import { speechAdapter, isSpeechSynthesisSupported } from "@/lib/chat/speech-adapter";
 import { SUGGESTIONS_CONFIG } from "@/config";
+import { ReasoningProvider } from "@/contexts/reasoning-context";
 
 /**
  * Main Runtime Provider
@@ -47,8 +48,10 @@ export function MyRuntimeProvider({
   });
 
   return (
-    <AssistantRuntimeProvider runtime={runtime} aui={aui}>
-      {children}
-    </AssistantRuntimeProvider>
+    <ReasoningProvider>
+      <AssistantRuntimeProvider runtime={runtime} aui={aui}>
+        {children}
+      </AssistantRuntimeProvider>
+    </ReasoningProvider>
   );
 }

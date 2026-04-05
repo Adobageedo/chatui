@@ -15,10 +15,13 @@ export async function POST(req: Request) {
     // Verify authentication
     await AuthMiddleware.verifyAuth();
     
-    const { messages } = await req.json();
+    const { messages, reasoningEnabled = false, emailContext = null } = await req.json();
 
     // Delegate to service layer
-    return await chatService.streamChat({ messages });
+    return await chatService.streamChat(
+      { messages, emailContext }, 
+      { reasoningEnabled, emailContext }
+    );
   } catch (error) {
     console.error("Chat API error:", error);
 

@@ -2,6 +2,31 @@ import type { ChatModelAdapter } from "@assistant-ui/react";
 import { API_ROUTES } from '@/config';
 
 /**
+ * Get reasoning mode from window context
+ */
+function getReasoningMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    // Access reasoning context from window
+    return (window as any).__reasoningEnabled__ || false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get email context from window
+ */
+function getEmailContext(): any | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return (window as any).__emailContext__ || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Chat Model Adapter for LocalRuntime
  * Handles streaming responses with tool calls from /api/chat endpoint
  * 
@@ -9,6 +34,7 @@ import { API_ROUTES } from '@/config';
  * - Streaming text responses
  * - Tool call handling with proper state accumulation
  * - Error handling and abort signal support
+ * - Reasoning mode support (uses o1-mini when enabled)
  */
 export const chatModelAdapter: ChatModelAdapter = {
   async *run({ messages, abortSignal }) {
@@ -35,10 +61,17 @@ export const chatModelAdapter: ChatModelAdapter = {
       return msg;
     });
     
+    const reasoningEnabled = getReasoningMode();
+    const emailContext = getEmailContext();
+    
     const response = await fetch(API_ROUTES.chat, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: processedMessages }),
+      body: JSON.stringify({ 
+        messages: processedMessages,
+        reasoningEnabled,
+        emailContext,
+      }),
       signal: abortSignal,
     });
 
@@ -54,6 +87,8 @@ export const chatModelAdapter: ChatModelAdapter = {
     const decoder = new TextDecoder();
     let buffer = "";
     let currentText = "";
+    let currentReasoning = "";
+    let currentReasoningId = "";
     
     // Store tool calls outside the loop to prevent UI flickering
     const toolCallsMap = new Map<
@@ -90,6 +125,18 @@ export const chatModelAdapter: ChatModelAdapter = {
             } else {
               data = JSON.parse(line);
             }
+            console.log("Data:", data);
+
+            // Handle reasoning start
+            if (data.type === "reasoning-start" && data.id) {
+              currentReasoningId = data.id;
+              currentReasoning = "";
+            }
+
+            // Handle reasoning deltas
+            if (data.type === "reasoning-delta" && data.delta) {
+              currentReasoning += data.delta;
+            }
 
             // Handle text deltas
             if (data.type === "text-delta" && data.delta) {
@@ -118,6 +165,7 @@ export const chatModelAdapter: ChatModelAdapter = {
 
             // Build content from accumulated state
             const content: any[] = [
+              ...(currentReasoning ? [{ type: "reasoning", text: currentReasoning }] : []),
               ...(currentText ? [{ type: "text", text: currentText }] : []),
               ...Array.from(toolCallsMap.values()),
             ];
