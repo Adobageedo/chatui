@@ -114,6 +114,7 @@ export function useAuth() {
     login,
     signup,
     logout,
+    signOut: logout, // Alias for logout
     resetPassword,
     completeOnboarding,
     clearError: () => setError(null),

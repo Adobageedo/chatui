@@ -6,3 +6,4 @@
 export { APP_CONFIG } from "./app.config";
 export { API_ROUTES } from "./api.config";
 export { ENV } from "./env.config";
+export { SUGGESTIONS_CONFIG } from "./suggestions.config";

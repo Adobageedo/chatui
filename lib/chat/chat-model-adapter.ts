@@ -12,10 +12,33 @@ import { API_ROUTES } from '@/config';
  */
 export const chatModelAdapter: ChatModelAdapter = {
   async *run({ messages, abortSignal }) {
+    // Merge attachment content into message content
+    const processedMessages = messages.map((msg: any) => {
+      // Check if message has attachments with content
+      if (msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+        // Collect all attachment content
+        const attachmentContents = msg.attachments
+          .filter((att: any) => att.content && Array.isArray(att.content))
+          .flatMap((att: any) => att.content);
+        
+        // Merge attachment content into message content
+        const mergedContent = [...msg.content, ...attachmentContents];
+        
+        return {
+          ...msg,
+          content: mergedContent,
+          // Remove attachments array to avoid duplication
+          attachments: undefined,
+        };
+      }
+      
+      return msg;
+    });
+    
     const response = await fetch(API_ROUTES.chat, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: processedMessages }),
       signal: abortSignal,
     });
 

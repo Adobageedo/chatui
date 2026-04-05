@@ -33,6 +33,7 @@ export const APP_CONFIG = {
     acceptedFileTypes: "image/*,application/pdf,.txt,.doc,.docx",
     acceptedImageTypes: "image/*",
     acceptedDocumentTypes: "application/pdf,.txt,.doc,.docx",
+    maxContentLength: 10000, // Max document content length to prevent context overflow
   },
 
   // AI Model

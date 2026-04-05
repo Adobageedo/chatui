@@ -1,10 +1,13 @@
 /**
  * Environment Variables Configuration
  * Centralized access to environment variables with validation
+ * 
+ * IMPORTANT: Next.js inlines NEXT_PUBLIC_* variables at BUILD TIME
+ * Must access them directly, not via dynamic keys
  */
 
-const getEnvVar = (key: string, defaultValue?: string): string => {
-  const value = process.env[key];
+// Helper for server-only variables
+const getServerEnvVar = (value: string | undefined, key: string, defaultValue?: string): string => {
   if (!value && !defaultValue) {
     throw new Error(`Missing required environment variable: ${key}`);
   }
@@ -12,21 +15,26 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
 };
 
 export const ENV = {
-  // Supabase
+  // Supabase - NEXT_PUBLIC_* variables work in browser and server
   supabase: {
-    url: getEnvVar("NEXT_PUBLIC_SUPABASE_URL"),
-    anonKey: getEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    serviceRoleKey: getEnvVar("SUPABASE_SERVICE_ROLE_KEY", ""),
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    // Server-only
+    serviceRoleKey: typeof window === 'undefined' 
+      ? getServerEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY", "")
+      : "",
   },
 
   // Site
   site: {
-    url: getEnvVar("NEXT_PUBLIC_SITE_URL"),
+    url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
   },
 
-  // OpenAI
+  // OpenAI - Server-only
   openai: {
-    apiKey: getEnvVar("OPENAI_API_KEY", ""),
+    apiKey: typeof window === 'undefined'
+      ? getServerEnvVar(process.env.OPENAI_API_KEY, "OPENAI_API_KEY", "")
+      : "",
   },
 
   // Node Environment

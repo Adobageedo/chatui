@@ -40,7 +40,7 @@ export const attachmentAdapter: AttachmentAdapter = {
       
       return attachment;
     } catch (error) {
-      console.error("❌ [Attachment] Upload error:", error);
+      console.error("Attachment upload error:", error);
       throw error;
     }
   },
@@ -53,17 +53,46 @@ export const attachmentAdapter: AttachmentAdapter = {
     // Cast to access custom properties we added in the add() method
     const attachmentWithUrl = attachment as typeof attachment & { url: string };
     
+    let content;
+    
+    if (attachment.type === "image") {
+      // For images, OpenAI can fetch from URL directly
+      content = { type: "image" as const, image: attachmentWithUrl.url };
+    } else {
+      // For documents, fetch the content so LLM can actually read it
+      try {
+        const response = await fetch(attachmentWithUrl.url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.statusText}`);
+        }
+        
+        const documentContent = await response.text();
+        
+        // Limit content to prevent context window exceeded errors
+        const maxContentLength = APP_CONFIG.upload.maxContentLength;
+        const limitedContent = documentContent.length > maxContentLength 
+          ? documentContent.substring(0, maxContentLength) + "\n\n[Content truncated...]"
+          : documentContent;
+        
+        // Include actual document content for LLM to read
+        content = { 
+          type: "text" as const, 
+          text: `File: ${attachment.name}\n\nContent:\n${limitedContent}` 
+        };
+      } catch (error) {
+        // Fallback to link if fetch fails
+        content = { 
+          type: "text" as const, 
+          text: `[Document: ${attachment.name}](${attachmentWithUrl.url})\n\nError: Could not fetch document content. Please check the URL.` 
+        };
+      }
+    }
+    
     const result = {
       ...attachment,
       status: { type: "complete" as const },
-      content: [
-        attachment.type === "image"
-          ? { type: "image" as const, image: attachmentWithUrl.url }
-          : { 
-              type: "text" as const, 
-              text: `[Document: ${attachment.name}](${attachmentWithUrl.url})` 
-            },
-      ],
+      content: [content],
     };
     
     return result;

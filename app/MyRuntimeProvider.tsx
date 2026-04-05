@@ -4,12 +4,15 @@ import type { ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   useRemoteThreadListRuntime,
+  useAui,
   useLocalRuntime,
+  Suggestions,
 } from "@assistant-ui/react";
 import { threadListAdapter } from "@/lib/chat/thread-list-adapter";
 import { chatModelAdapter } from "@/lib/chat/chat-model-adapter";
 import { attachmentAdapter } from "@/lib/chat/attachment-adapter";
 import { speechAdapter, isSpeechSynthesisSupported } from "@/lib/chat/speech-adapter";
+import { SUGGESTIONS_CONFIG } from "@/config";
 
 /**
  * Main Runtime Provider
@@ -24,6 +27,10 @@ import { speechAdapter, isSpeechSynthesisSupported } from "@/lib/chat/speech-ada
 export function MyRuntimeProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
+    const aui = useAui({
+    suggestions: Suggestions(SUGGESTIONS_CONFIG),
+  });
+
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: () => {
       return useLocalRuntime(chatModelAdapter, {
@@ -40,7 +47,7 @@ export function MyRuntimeProvider({
   });
 
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
+    <AssistantRuntimeProvider runtime={runtime} aui={aui}>
       {children}
     </AssistantRuntimeProvider>
   );
