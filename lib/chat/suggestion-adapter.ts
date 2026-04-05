@@ -17,7 +17,7 @@ export function useSuggestionAdapter(): SuggestionAdapter {
       /**
        * Generate suggestions based on conversation
        */
-      async *generate({ messages }: { messages: any[] }) {
+      async *generate({ messages }: { messages: readonly any[] }) {
         try {
           const { remoteId } = aui.threadListItem().getState();
           

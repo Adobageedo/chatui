@@ -125,8 +125,6 @@ export const chatModelAdapter: ChatModelAdapter = {
             } else {
               data = JSON.parse(line);
             }
-            console.log("Data:", data);
-
             // Handle reasoning start
             if (data.type === "reasoning-start" && data.id) {
               currentReasoningId = data.id;

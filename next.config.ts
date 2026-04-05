@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: APP_CONFIG.upload.maxFileSizeMB,
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: '/outlook/:path*',
+        destination: '/api/outlook-addin/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -303,16 +303,17 @@ export const EmailProvider: React.FC<EmailProviderProps> = ({
 
   const sendGmailMessage = async (message: any): Promise<any> => {
     return new Promise((resolve, reject) => {
-      if (!window.chrome?.tabs) {
+      const chrome = window.chrome;
+      if (!chrome?.tabs) {
         reject(new Error('Chrome tabs API not available'));
         return;
       }
       
-      window.chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-        if (tabs[0]?.id) {
-          window.chrome.tabs.sendMessage(tabs[0].id, message, (response: any) => {
-            if (window.chrome.runtime.lastError) {
-              reject(new Error(window.chrome.runtime.lastError.message));
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        if (tabs[0]?.id && chrome.tabs) {
+          chrome.tabs.sendMessage(tabs[0].id, message, (response: any) => {
+            if (chrome.runtime?.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
             } else {
               resolve(response);
             }

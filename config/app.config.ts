@@ -23,7 +23,7 @@ export const APP_CONFIG = {
       forgotPassword: "/forgot-password",
       resetPassword: "/auth/reset-password",
     },
-    publicRoutes: ["/login", "/signup", "/auth/callback", "/forgot-password"],
+    publicRoutes: ["/login", "/signup", "/auth/callback", "/forgot-password", "/outlook"],
   },
 
   // File Upload

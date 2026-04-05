@@ -34,9 +34,13 @@ export function useThreadHistoryAdapter(): ThreadHistoryAdapter {
           // Convert to { parentId, message } wrapper format expected by useLocalRuntime
           return {
             messages: messages.map((msg: any, index: number) => {
-              const messageId = msg.metadata?.messageId || msg.id;
+              const messageId = String(msg.metadata?.messageId || msg.id);
+              const prevMessageId = index > 0 
+                ? String(messages[index - 1].metadata?.messageId || messages[index - 1].id)
+                : null;
+              
               return {
-                parentId: index > 0 ? (messages[index - 1].metadata?.messageId || messages[index - 1].id) : null,
+                parentId: prevMessageId,
                 message: {
                   id: messageId,
                   role: msg.role,

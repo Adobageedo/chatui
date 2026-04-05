@@ -5,7 +5,7 @@ import "@assistant-ui/react-markdown/styles/dot.css";
 import { FC, useState } from "react";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
@@ -25,12 +25,10 @@ export const ReasoningDisplay: FC<{ text: string; isStreaming?: boolean }> = ({ 
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="border-t border-border">
-        <div className="max-h-64 overflow-y-auto px-4 py-3 text-sm text-muted-foreground">
-          <MarkdownTextPrimitive
-            text={text}
-            remarkPlugins={[remarkGfm]}
-            className="aui-md"
-          />
+        <div className="max-h-64 overflow-y-auto px-4 py-3 text-sm text-muted-foreground aui-md">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {text}
+          </ReactMarkdown>
         </div>
       </CollapsibleContent>
     </Collapsible>
