@@ -1,0 +1,33 @@
+import { chatService } from "@/service/api/chat/chat.service";
+import { ApiResponseBuilder } from "@/service/api/shared/api-response";
+import { ApiError } from "@/service/api/shared/api-error";
+import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
+import { APP_CONFIG } from '@/config';
+
+export const maxDuration = APP_CONFIG.ai.maxDuration;
+
+/**
+ * Chat endpoint for LocalRuntime
+ * Thin controller - delegates to ChatService
+ */
+export async function POST(req: Request) {
+  try {
+    // Verify authentication
+    await AuthMiddleware.verifyAuth();
+    
+    const { messages } = await req.json();
+
+    // Delegate to service layer
+    return await chatService.streamChat({ messages });
+  } catch (error) {
+    console.error("Chat API error:", error);
+
+    // Handle custom API errors
+    if (error instanceof ApiError) {
+      return ApiResponseBuilder.error(error.message, error.statusCode, error.details);
+    }
+
+    // Handle unexpected errors
+    return ApiResponseBuilder.serverError(error);
+  }
+}
