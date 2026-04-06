@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ENV, APP_CONFIG } from '@/config';
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -8,8 +7,8 @@ export async function middleware(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    ENV.supabase.url,
-    ENV.supabase.anonKey,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
@@ -37,7 +36,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = APP_CONFIG.auth.publicRoutes;
+  const publicRoutes = ["/login", "/signup", "/auth/callback", "/forgot-password", "/outlook"];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
   // Redirect authenticated users away from auth pages
@@ -45,22 +44,22 @@ export async function middleware(request: NextRequest) {
     const onboardingCompleted = user?.user_metadata?.onboarding_completed;
 
     if (!onboardingCompleted) {
-      return NextResponse.redirect(new URL(APP_CONFIG.auth.redirectUrls.onboarding, request.url));
+      return NextResponse.redirect(new URL("/onboarding", request.url));
     }
-    return NextResponse.redirect(new URL(APP_CONFIG.auth.redirectUrls.chat, request.url));
+    return NextResponse.redirect(new URL("/chat", request.url));
   }
 
   // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
-    return NextResponse.redirect(new URL(APP_CONFIG.auth.redirectUrls.login, request.url));
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   // Check onboarding completion for protected routes
-  if (user && !isPublicRoute && pathname !== APP_CONFIG.auth.redirectUrls.onboarding) {
+  if (user && !isPublicRoute && pathname !== "/onboarding") {
     const onboardingCompleted = user?.user_metadata?.onboarding_completed;
 
     if (!onboardingCompleted) {
-      return NextResponse.redirect(new URL(APP_CONFIG.auth.redirectUrls.onboarding, request.url));
+      return NextResponse.redirect(new URL("/onboarding", request.url));
     }
   }
 
