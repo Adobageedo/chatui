@@ -6,11 +6,11 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Email AI Assistant"/>
   <Description DefaultValue="AI-powered email management and composition assistant for Outlook"/>
-  <IconUrl DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/support"/>
+  <IconUrl DefaultValue="https://chatui-nine-mu.vercel.app/outlook/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://chatui-nine-mu.vercel.app/outlook/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://chatui-nine-mu.vercel.app/outlook/support"/>
   <AppDomains>
-    <AppDomain>https://easier-snappily-ansley.ngrok-free.dev</AppDomain>
+    <AppDomain>https://chatui-nine-mu.vercel.app</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
@@ -23,7 +23,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/taskpane.html"/>
+        <SourceLocation DefaultValue="https://chatui-nine-mu.vercel.app/outlook/taskpane.html"/>
         <RequestedHeight>350</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -94,14 +94,14 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/commands.html"/>
-        <bt:Url id="Taskpane.ComposeUrl" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/taskpane.html?mode=compose"/>
-        <bt:Url id="Taskpane.ReadUrl" DefaultValue="https://easier-snappily-ansley.ngrok-free.dev/outlook/taskpane.html?mode=read"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/commands.html"/>
+        <bt:Url id="Taskpane.ComposeUrl" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/taskpane.html?mode=compose"/>
+        <bt:Url id="Taskpane.ReadUrl" DefaultValue="https://chatui-nine-mu.vercel.app/outlook/taskpane.html?mode=read"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Email Template Generator"/>

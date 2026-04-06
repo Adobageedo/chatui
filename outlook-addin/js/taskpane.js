@@ -1,21 +1,14 @@
-// Firebase configuration
-const firebaseConfig = {
-  // Firebase web configuration (not service account credentials)
-  apiKey: "AIzaSyC_0gsL5LVVfuUPCToWP0jPeSX3ysZ6Adk", // Example API key, replace with your actual web API key
-  authDomain: "localai-e15cb.firebaseapp.com",
-  projectId: "localai-e15cb",
-  storageBucket: "localai-e15cb.appspot.com",
-  // Replace these values with your actual configuration
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+// Supabase configuration
+const SUPABASE_URL = 'https://easier-snappily-ansley.ngrok-free.dev'; // Replace with your actual Supabase URL from env
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your actual Supabase anon key
 
-// API endpoint for template generation
-const API_BASE_URL = "https://chardouin.fr/api";
-const API_PROMPT_ENDPOINT = `${API_BASE_URL}/prompt`;
+// API endpoint for chat
+const API_BASE_URL = "https://chatui-nine-mu.vercel.app";
+const API_CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`;
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Supabase client (simplified - using REST API directly)
+let currentUser = null;
+let authToken = null;
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) {
@@ -40,30 +33,35 @@ function initializeApp() {
 
 // Authentication state observer
 function checkAuthState() {
-  firebase.auth().onAuthStateChanged(function(user) {
-    if (user) {
-      // User is signed in
-      document.getElementById('login-form').style.display = 'none';
-      document.getElementById('user-info').style.display = 'block';
-      document.getElementById('user-email').textContent = user.email;
-      
-      // Show email context section
-      document.getElementById('email-context-section').style.display = 'block';
-      
-      // Check if an email is selected or open
-      checkEmailContext();
-    } else {
-      // User is signed out
-      document.getElementById('login-form').style.display = 'block';
-      document.getElementById('user-info').style.display = 'none';
-      document.getElementById('email-context-section').style.display = 'none';
-      document.getElementById('template-result-section').style.display = 'none';
-    }
-  });
+  // Check for stored session
+  const storedUser = localStorage.getItem('outlook_user');
+  const storedToken = localStorage.getItem('outlook_token');
+  
+  if (storedUser && storedToken) {
+    currentUser = JSON.parse(storedUser);
+    authToken = storedToken;
+    
+    // User is signed in
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('user-info').style.display = 'block';
+    document.getElementById('user-email').textContent = currentUser.email;
+    
+    // Show email context section
+    document.getElementById('email-context-section').style.display = 'block';
+    
+    // Check if an email is selected or open
+    checkEmailContext();
+  } else {
+    // User is signed out
+    document.getElementById('login-form').style.display = 'block';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('email-context-section').style.display = 'none';
+    document.getElementById('template-result-section').style.display = 'none';
+  }
 }
 
 // Handle login form submission
-function handleLogin() {
+async function handleLogin() {
   const email = document.getElementById('email-input').value;
   const password = document.getElementById('password-input').value;
   const errorElement = document.getElementById('auth-error');
@@ -74,24 +72,54 @@ function handleLogin() {
     return;
   }
   
-  firebase.auth().signInWithEmailAndPassword(email, password)
-    .catch(function(error) {
-      // Handle Errors here.
-      errorElement.textContent = error.message;
-      errorElement.style.display = 'block';
+  try {
+    // Call Supabase auth API
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ email, password })
     });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error_description || 'Login failed');
+    }
+    
+    const data = await response.json();
+    
+    // Store user and token
+    currentUser = data.user;
+    authToken = data.access_token;
+    localStorage.setItem('outlook_user', JSON.stringify(currentUser));
+    localStorage.setItem('outlook_token', authToken);
+    
+    // Update UI
+    errorElement.style.display = 'none';
+    checkAuthState();
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.style.display = 'block';
+  }
 }
 
 // Redirect to registration page
 function redirectToRegister() {
-  window.open('https://chardouin.fr/register', '_blank');
+  window.open('https://chatui-nine-mu.vercel.app/signup', '_blank');
 }
 
 // Handle logout
 function handleLogout() {
-  firebase.auth().signOut().catch(function(error) {
-    console.error('Sign Out Error', error);
-  });
+  // Clear stored session
+  localStorage.removeItem('outlook_user');
+  localStorage.removeItem('outlook_token');
+  currentUser = null;
+  authToken = null;
+  
+  // Update UI
+  checkAuthState();
 }
 
 // Check if an email is selected or open
@@ -208,21 +236,17 @@ function generateTemplate() {
 
 // Authenticated fetch helper function
 async function authFetch(url, options = {}) {
-  const user = firebase.auth().currentUser;
-  
-  if (!user) {
+  if (!authToken) {
     throw new Error('User not authenticated');
   }
-  
-  // Get the user's ID token
-  const idToken = await user.getIdToken(true);
   
   // Add authorization header
   const authOptions = {
     ...options,
     headers: {
       ...options.headers,
-      'Authorization': `Bearer ${idToken}`
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json'
     }
   };
   
@@ -232,44 +256,93 @@ async function authFetch(url, options = {}) {
 // Call API to generate template
 async function callTemplateGenerationAPI(subject, body) {
   try {
-    const user = firebase.auth().currentUser;
-    
-    if (!user) {
+    if (!authToken) {
       handleTemplateError('User not authenticated');
       return;
     }
     
-    const promptData = {
-      question: subject,
-      temperature: 0.7,
-      model: 'gpt-4o-mini',
-      use_retrieval: true,
-      include_profile_context: false,
-      conversation_history: [],
-      // Include email body as context
-      email_body: body
+    // Get current email context
+    const mailboxItem = Office.context.mailbox.item;
+    let from = '';
+    let to = [];
+    
+    if (mailboxItem.from) {
+      from = mailboxItem.from.emailAddress || mailboxItem.from.displayName || '';
+    }
+    
+    // Build email context for the API
+    const emailContext = {
+      platform: 'outlook',
+      currentEmail: {
+        subject: subject || '',
+        from: from,
+        to: to,
+        body: body || '',
+        date: new Date().toISOString()
+      }
     };
     
+    // Create message for chat API
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Generate a professional email response based on this context:\n\nSubject: ${subject}\nFrom: ${from}\n\nEmail content:\n${body}\n\nPlease write a professional and contextual response.`
+          }
+        ]
+      }
+    ];
+    
     // Use the authenticated fetch function
-    const response = await authFetch(API_PROMPT_ENDPOINT, {
+    const response = await authFetch(API_CHAT_ENDPOINT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(promptData)
+      body: JSON.stringify({
+        messages: messages,
+        emailContext: emailContext,
+        reasoningEnabled: false
+      })
     });
     
     if (!response.ok) {
       throw new Error(`API request failed with status ${response.status}`);
     }
     
-    const data = await response.json();
-    console.log(data);
+    // Parse streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let generatedText = '';
+    
     // Hide loading state
     document.getElementById('loading-spinner').style.display = 'none';
+    document.getElementById('template-content').textContent = '';
     
-    // Display the generated template
-    document.getElementById('template-content').textContent = data.response || data.template || 'No template generated';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+      
+      for (const line of lines) {
+        if (!line.trim() || !line.startsWith('0:')) continue;
+        
+        try {
+          const json = JSON.parse(line.slice(2));
+          if (json.type === 'text-delta' && json.delta) {
+            generatedText += json.delta;
+            document.getElementById('template-content').textContent = generatedText;
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+    
+    if (!generatedText) {
+      document.getElementById('template-content').textContent = 'No response generated';
+    }
   } catch (error) {
     handleTemplateError('Error generating template: ' + error.message);
   }
