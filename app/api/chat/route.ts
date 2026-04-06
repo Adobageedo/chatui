@@ -2,9 +2,8 @@ import { chatService } from "@/service/api/chat/chat.service";
 import { ApiResponseBuilder } from "@/service/api/shared/api-response";
 import { ApiError } from "@/service/api/shared/api-error";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
-import { APP_CONFIG } from '@/config';
 
-export const maxDuration = APP_CONFIG.ai.maxDuration;
+export const maxDuration = 30;
 
 /**
  * Chat endpoint for LocalRuntime
