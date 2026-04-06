@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: APP_CONFIG.upload.maxFileSizeMB,
     },
   },
+  allowedDevOrigins: ['easier-snappily-ansley.ngrok-free.dev'],
 };
 
 export default nextConfig;

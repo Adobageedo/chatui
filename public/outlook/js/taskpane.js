@@ -1,6 +1,6 @@
 // Supabase configuration
-const SUPABASE_URL = 'https://easier-snappily-ansley.ngrok-free.dev'; // Replace with your actual Supabase URL from env
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your actual Supabase anon key
+const SUPABASE_URL = 'https://rowzwlrxxwwuqiryqwhu.supabase.co'; // Replace with your actual Supabase URL from env
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvd3p3bHJ4eHd3dXFpcnlxd2h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzIyNTgsImV4cCI6MjA4ODA0ODI1OH0.F6gg-3LBakIHJmssTz9NRqg1hFrvkgN6cwhgdhQUahk'; // Replace with your actual Supabase anon key
 
 // API endpoint for chat
 const API_BASE_URL = "https://chatui-nine-mu.vercel.app";
