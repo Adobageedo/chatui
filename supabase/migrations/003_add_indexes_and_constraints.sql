@@ -32,17 +32,13 @@ CREATE INDEX IF NOT EXISTS idx_chat_threads_user_active
 CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_id 
     ON public.chat_messages(thread_id);
 
--- Index for ordering messages by sequence
-CREATE INDEX IF NOT EXISTS idx_chat_messages_sequence 
-    ON public.chat_messages(thread_id, sequence_number ASC);
-
 -- Index for message role filtering
 CREATE INDEX IF NOT EXISTS idx_chat_messages_role 
     ON public.chat_messages(role);
 
--- Composite index for thread message retrieval
-CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_sequence 
-    ON public.chat_messages(thread_id, sequence_number ASC, created_at ASC);
+-- Composite index for thread message retrieval (by created_at)
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created 
+    ON public.chat_messages(thread_id, created_at ASC);
 
 -- ============================================================================
 -- DATA INTEGRITY CONSTRAINTS
@@ -62,11 +58,6 @@ ALTER TABLE public.chat_threads
 ALTER TABLE public.chat_messages
     ADD CONSTRAINT check_message_content_not_empty 
     CHECK (content IS NOT NULL AND content::text != '{}');
-
--- Ensure sequence numbers are positive
-ALTER TABLE public.chat_messages
-    ADD CONSTRAINT check_sequence_positive 
-    CHECK (sequence_number > 0);
 
 -- ============================================================================
 -- PERFORMANCE: Partial Indexes
@@ -94,6 +85,5 @@ ANALYZE public.user_profiles;
 -- Add comments for documentation
 COMMENT ON INDEX idx_chat_threads_user_id IS 'Optimizes thread lookups by user';
 COMMENT ON INDEX idx_chat_threads_user_active IS 'Optimizes active thread queries';
-COMMENT ON INDEX idx_chat_messages_thread_sequence IS 'Optimizes message retrieval in order';
+COMMENT ON INDEX idx_chat_messages_thread_created IS 'Optimizes message retrieval by creation time';
 COMMENT ON CONSTRAINT check_thread_title_not_empty ON public.chat_threads IS 'Prevents empty thread titles';
-COMMENT ON CONSTRAINT check_sequence_positive ON public.chat_messages IS 'Ensures valid message sequence numbers';

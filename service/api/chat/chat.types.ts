@@ -36,4 +36,5 @@ export interface ChatStreamOptions {
   temperature?: number;
   reasoningEnabled?: boolean;
   emailContext?: EmailContext | null;
+  frontendTools?: Record<string, { description?: string; parameters: any }> | null;
 }

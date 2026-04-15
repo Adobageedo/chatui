@@ -7,7 +7,9 @@ import {
   useAui,
   useLocalRuntime,
   Suggestions,
+  Tools,
 } from "@assistant-ui/react";
+import { appToolkit } from "@/lib/toolkit";
 import { threadListAdapter } from "@/lib/chat/thread-list-adapter";
 import { chatModelAdapter } from "@/lib/chat/chat-model-adapter";
 import { attachmentAdapter } from "@/lib/chat/attachment-adapter";
@@ -28,13 +30,15 @@ import { ReasoningProvider } from "@/contexts/reasoning-context";
 export function MyRuntimeProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-    const aui = useAui({
+  const aui = useAui({
     suggestions: Suggestions(SUGGESTIONS_CONFIG),
+    tools: Tools({ toolkit: appToolkit }),
   });
 
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: () => {
       return useLocalRuntime(chatModelAdapter, {
+        maxSteps: 5,
         adapters: {
           attachments: attachmentAdapter,
           // Only add speech adapter if browser supports it

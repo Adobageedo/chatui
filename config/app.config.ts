@@ -18,12 +18,13 @@ export const APP_CONFIG = {
       login: "/login",
       signup: "/signup",
       chat: "/chat",
+      outlook: "/outlook",
       onboarding: "/onboarding",
       authCallback: "/auth/callback",
       forgotPassword: "/forgot-password",
       resetPassword: "/auth/reset-password",
     },
-    publicRoutes: ["/login", "/signup", "/auth/callback", "/forgot-password", "/outlook"],
+    publicRoutes: ["/login", "/signup", "/auth/callback", "/forgot-password"],
   },
 
   // File Upload

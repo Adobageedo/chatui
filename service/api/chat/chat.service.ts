@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import { streamText, tool, stepCountIs, zodSchema } from "ai";
 import { z } from "zod";
+import { getTodayDateSchema, executeGetTodayDate } from "@/lib/tools/backend/date-tools";
 import { APP_CONFIG } from '@/config';
 import { ValidationError } from "../shared/api-error";
 import type { ChatRequest, ChatStreamOptions } from "./chat.types";
@@ -101,6 +102,11 @@ export class ChatService {
    */
   private getTools() {
     return {
+      // getTodayDate: tool({
+      //   description: "Get the current date and time",
+      //   inputSchema: zodSchema(getTodayDateSchema),
+      //   execute: executeGetTodayDate,
+      // }),
       get_current_weather: tool({
         description: "Get the current weather in a given city",
         inputSchema: zodSchema(

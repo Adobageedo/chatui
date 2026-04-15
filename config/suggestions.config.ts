@@ -10,9 +10,9 @@ export const SUGGESTIONS_CONFIG = [
     prompt: "Recherche tous mes baux actifs",
   },
   {
-    title: "Résumé d'un bail",
-    label: "Résumé de bail",
-    prompt: "Donne-moi un résumé du dernier bail",
+    title: "Date du jour",
+    label: "Date d'aujourd'hui",
+    prompt: "Donne-moi la date d'aujourd'hui",
   },
   {
     title: "Reasoning",

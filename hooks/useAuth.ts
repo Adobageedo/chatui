@@ -23,8 +23,15 @@ export function useAuth() {
     if (result.success) {
       await refreshAuth();
       
+      // Check for redirect parameter in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect');
+      
       if (user?.user_metadata?.onboarding_completed === false) {
         router.push("/onboarding");
+      } else if (redirectTo) {
+        // Redirect to intended destination
+        router.push(redirectTo);
       } else {
         router.push("/chat");
       }

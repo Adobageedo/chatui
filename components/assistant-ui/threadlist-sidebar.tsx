@@ -18,7 +18,7 @@ export function ThreadListSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
-      <SidebarHeader className="aui-sidebar-header mb-2 border-b">
+      <SidebarHeader className="aui-sidebar-header mb-2 border-b h-16">
         <div className="aui-sidebar-header-content flex items-center justify-between">
           <SidebarMenu>
             <SidebarMenuItem>

@@ -13,6 +13,7 @@ import {
   Settings,
   Sparkles,
   ChevronDown,
+  FolderOpen,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -32,6 +33,7 @@ export const Navbar = ({ hideLogo = false }: NavbarProps) => {
 
   const navLinks = [
     { href: "/chat", label: "Chat", icon: MessageSquare },
+    { href: "/files", label: "Files", icon: FolderOpen },
     { href: "/profile", label: "Profile", icon: User },
   ];
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppProviders } from "./AppProviders";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "ChatUI - AI Assistant",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en" className="h-dvh">
       <body className="h-dvh antialiased">
         <AppProviders>{children}</AppProviders>
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

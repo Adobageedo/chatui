@@ -33,6 +33,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SquareIcon,
+  LoaderIcon,
 } from "lucide-react";
 import { type FC } from "react";
 import { ReasoningToggle } from "@/components/ui/reasoning-toggle";
@@ -226,12 +227,34 @@ const AssistantMessage: FC = () => {
           }}
         </MessagePrimitive.Parts>
         <MessageError />
+        <AuiIf condition={(s) => s.thread.isRunning && s.message.content.length === 0}>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <LoaderIcon className="size-4 animate-spin" />
+            <span className="text-sm">Thinking...</span>
+          </div>
+        </AuiIf>
+
       </div>
 
       <div className="aui-assistant-message-footer mt-1 ml-2 flex min-h-6 items-center">
         <BranchPicker />
         <AssistantActionBar />
       </div>
+      {/* <AuiIf condition={(s) => !s.thread.isRunning}>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ThreadPrimitive.Suggestions>
+            {({ suggestion }) => (
+              <ThreadPrimitive.Suggestion
+                key={suggestion.prompt}
+                prompt={suggestion.prompt}
+                className="rounded-full border bg-background px-3 py-1 text-sm hover:bg-muted"
+              >
+                {suggestion.prompt}
+              </ThreadPrimitive.Suggestion>
+            )}
+          </ThreadPrimitive.Suggestions>
+        </div>
+      </AuiIf> */}
     </MessagePrimitive.Root>
   );
 };
