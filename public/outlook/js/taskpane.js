@@ -1,6 +1,6 @@
 // Supabase configuration
-const SUPABASE_URL = 'https://rowzwlrxxwwuqiryqwhu.supabase.co'; // Replace with your actual Supabase URL from env
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvd3p3bHJ4eHd3dXFpcnlxd2h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzIyNTgsImV4cCI6MjA4ODA0ODI1OH0.F6gg-3LBakIHJmssTz9NRqg1hFrvkgN6cwhgdhQUahk'; // Replace with your actual Supabase anon key
+const SUPABASE_URL = 'https://easier-snappily-ansley.ngrok-free.dev'; // Replace with your actual Supabase URL from env
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your actual Supabase anon key
 
 // API endpoint for chat
 const API_BASE_URL = "https://chatui-nine-mu.vercel.app";
@@ -124,58 +124,48 @@ function handleLogout() {
 
 // Check if an email is selected or open
 function checkEmailContext() {
-  // First try to get mailbox item without token for basic info
-  const mailboxItem = Office.context.mailbox.item;
-  
-  if (mailboxItem) {
-    // Email is selected or open - show basic info without requiring token
-    document.getElementById('no-email-selected').style.display = 'none';
-    document.getElementById('email-selected').style.display = 'block';
-    
-    // Get email details - handle both read and compose modes
-    // In read mode, subject is a property; in compose mode, it's an object with getAsync()
-    if (typeof mailboxItem.subject === 'string') {
-      // Read mode - subject is directly available as a string property
-      document.getElementById('email-subject').textContent = mailboxItem.subject || '(No subject)';
-    } else if (typeof mailboxItem.subject === 'object' && mailboxItem.subject.getAsync) {
-      // Compose mode - need to call getAsync()
-      mailboxItem.subject.getAsync(function(asyncResult) {
-        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-          document.getElementById('email-subject').textContent = asyncResult.value || '(No subject)';
-        }
-      });
-    } else {
-      // Fallback
-      document.getElementById('email-subject').textContent = '(No subject data)';
-    }
-    
-    // If in read mode, we can get sender info
-    if (mailboxItem.from) {
-      document.getElementById('email-from').textContent = mailboxItem.from.emailAddress || mailboxItem.from.displayName || 'Unknown';
-    } else {
-      document.getElementById('email-from').textContent = 'N/A';
-    }
-    
-    // Only try to get callback token if we need it for advanced features
-    // This prevents the 9018 error from blocking basic functionality
-    tryGetCallbackToken();
-  } else {
-    // No email selected or open
-    document.getElementById('no-email-selected').style.display = 'block';
-    document.getElementById('email-selected').style.display = 'none';
-  }
-}
-
-// Separate function to get callback token with better error handling
-function tryGetCallbackToken() {
   Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function(result) {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
-      console.log('Callback token obtained successfully');
-      // Token is available for REST API calls if needed
+      // Check if we're in a read or compose mode
+      const mailboxItem = Office.context.mailbox.item;
+      
+      if (mailboxItem) {
+        // Email is selected or open
+        document.getElementById('no-email-selected').style.display = 'none';
+        document.getElementById('email-selected').style.display = 'block';
+        
+        // Get email details - handle both read and compose modes
+        // In read mode, subject is a property; in compose mode, it's an object with getAsync()
+        if (typeof mailboxItem.subject === 'string') {
+          // Read mode - subject is directly available as a string property
+          document.getElementById('email-subject').textContent = mailboxItem.subject || '(No subject)';
+        } else if (typeof mailboxItem.subject === 'object' && mailboxItem.subject.getAsync) {
+          // Compose mode - need to call getAsync()
+          mailboxItem.subject.getAsync(function(asyncResult) {
+            if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+              document.getElementById('email-subject').textContent = asyncResult.value || '(No subject)';
+            }
+          });
+        } else {
+          // Fallback
+          document.getElementById('email-subject').textContent = '(No subject data)';
+        }
+        
+        // If in read mode, we can get sender info
+        if (mailboxItem.from) {
+          document.getElementById('email-from').textContent = mailboxItem.from.emailAddress || mailboxItem.from.displayName || 'Unknown';
+        } else {
+          document.getElementById('email-from').textContent = 'N/A';
+        }
+      } else {
+        // No email selected or open
+        document.getElementById('no-email-selected').style.display = 'block';
+        document.getElementById('email-selected').style.display = 'none';
+      }
     } else {
-      console.warn('Could not obtain callback token:', result.error);
-      // Don't show error to user as basic functionality still works
-      // This is common in some Outlook environments
+      console.error('Error getting callback token:', result.error);
+      document.getElementById('no-email-selected').style.display = 'block';
+      document.getElementById('email-selected').style.display = 'none';
     }
   });
 }
@@ -305,32 +295,18 @@ async function callTemplateGenerationAPI(subject, body) {
       }
     ];
     
-    // Use the authenticated fetch function with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-    
+    // Use the authenticated fetch function
     const response = await authFetch(API_CHAT_ENDPOINT, {
       method: 'POST',
       body: JSON.stringify({
         messages: messages,
         emailContext: emailContext,
         reasoningEnabled: false
-      }),
-      signal: controller.signal
+      })
     });
     
-    clearTimeout(timeoutId);
-    
     if (!response.ok) {
-      if (response.status === 0) {
-        throw new Error('Network error - please check your connection');
-      } else if (response.status === 401) {
-        throw new Error('Authentication failed - please sign in again');
-      } else if (response.status === 403) {
-        throw new Error('Access denied - please check your permissions');
-      } else {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
+      throw new Error(`API request failed with status ${response.status}`);
     }
     
     // Parse streaming response
@@ -368,11 +344,7 @@ async function callTemplateGenerationAPI(subject, body) {
       document.getElementById('template-content').textContent = 'No response generated';
     }
   } catch (error) {
-    if (error.name === 'AbortError') {
-      handleTemplateError('Request timed out - please try again');
-    } else {
-      handleTemplateError('Error generating template: ' + error.message);
-    }
+    handleTemplateError('Error generating template: ' + error.message);
   }
 }
 
