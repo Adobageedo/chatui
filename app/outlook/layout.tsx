@@ -1,4 +1,4 @@
-import Script from "next/script";
+import { OfficeScript } from "./office-script";
 
 export const metadata = {
   title: "ChatUI - Email Assistant",
@@ -11,10 +11,7 @@ export default function OutlookLayout({
 }) {
   return (
     <>
-      <Script
-        src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"
-        strategy="beforeInteractive"
-      />
+      <OfficeScript />
       {children}
     </>
   );

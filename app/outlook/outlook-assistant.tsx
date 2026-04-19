@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Assistant } from "../chat/assistant";
-import { Button } from "@/components/ui/button";
-import { MessageSquare, Mail, ArrowLeft } from "lucide-react";
+import { Mail, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface EmailContext {
   subject?: string;
@@ -11,106 +11,167 @@ interface EmailContext {
   to?: string[];
   body?: string;
   itemType?: string;
-}
-
-interface TemplateData {
-  subject?: string;
-  content: string;
+  cc?: string[];
+  bcc?: string[];
 }
 
 export function OutlookAssistant() {
   const [isOutlookMode, setIsOutlookMode] = useState(false);
   const [emailContext, setEmailContext] = useState<EmailContext | null>(null);
+  const [isLoadingContext, setIsLoadingContext] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if we're running in Outlook iframe
+    console.log('[OutlookAssistant] starting auth check...');
+    const supabase = createClient();
+
+    const checkAuth = async () => {
+      // First, check if we have tokens in URL hash (passed from sign-in page)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('[OutlookAssistant] Found tokens in URL hash, setting session...');
+        try {
+          // Parse hash params
+          const params = new URLSearchParams(hash.substring(1));
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+
+          if (access_token) {
+            // Set the session from tokens
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token: refresh_token || '',
+            });
+
+            if (error) {
+              console.error('[OutlookAssistant] Failed to set session:', error);
+            } else if (data.session) {
+              console.log('[OutlookAssistant] Session established from tokens');
+              // Clear hash so tokens aren't in URL
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              setIsAuthenticated(true);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('[OutlookAssistant] Error parsing tokens:', err);
+        }
+      }
+
+      // Otherwise check for existing session (with retries for embedded browser)
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      const tryGetSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log(`[OutlookAssistant] auth check attempt ${attempts + 1}, session:`, !!session);
+
+        if (session) {
+          setIsAuthenticated(true);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(tryGetSession, 300);
+        } else {
+          setIsAuthenticated(false);
+        }
+      };
+
+      await tryGetSession();
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[OutlookAssistant] auth state change:', event, !!session);
+      if (session) {
+        setIsAuthenticated(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      window.location.href = "/outlook/signin";
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     const outlookMode = urlParams.get('outlook') === 'true';
     setIsOutlookMode(outlookMode);
 
     if (outlookMode) {
-      // Setup iframe communication
-      setupIframeCommunication();
-      
-      // Notify parent that we're ready
-      window.parent.postMessage({
-        type: 'OUTLOOK_READY'
-      }, '*');
-
-      // Request email context
-      window.parent.postMessage({
-        type: 'OUTLOOK_GET_EMAIL_CONTEXT'
-      }, '*');
-    }
-  }, []);
-
-  const setupIframeCommunication = () => {
-    // Listen for messages from parent (Outlook taskpane)
-    window.addEventListener('message', function(event) {
-      const { type, data } = event.data;
-
-      switch (type) {
-        case 'OUTLOOK_EMAIL_CONTEXT':
-        case 'OUTLOOK_EMAIL_CONTEXT_UPDATE':
-          console.log('Received email context:', data);
-          setEmailContext(data);
-          break;
-        case 'OUTLOOK_ITEM_CHANGED':
-          // Item changed in pinned task pane - request updated context
-          console.log('Email item changed, requesting new context...');
-          window.parent.postMessage({
-            type: 'OUTLOOK_GET_EMAIL_CONTEXT'
-          }, '*');
-          break;
-        case 'NOTIFICATION':
-          // Handle notifications from Outlook
-          console.log('Outlook notification:', data);
-          break;
+      // Read email context stored by taskpane.html before redirecting here
+      try {
+        const stored = sessionStorage.getItem('outlook_email_context');
+        if (stored) {
+          const ctx = JSON.parse(stored);
+          console.log('[OutlookAssistant] loaded email context from sessionStorage:', ctx);
+          setEmailContext(ctx);
+          sessionStorage.removeItem('outlook_email_context');
+        }
+      } catch (e) {
+        console.warn('[OutlookAssistant] failed to read sessionStorage context:', e);
       }
-    });
-  };
-
-  const sendToOutlook = (type: string, data: any) => {
-    if (isOutlookMode && window.parent) {
-      window.parent.postMessage({
-        type,
-        data
-      }, '*');
+      setIsLoadingContext(false);
+    } else {
+      setIsLoadingContext(false);
     }
-  };
+  }, [isAuthenticated]);
 
-  const handleInsertTemplate = (content: string) => {
-    sendToOutlook('OUTLOOK_INSERT_TEMPLATE', { content });
-  };
+  console.log('[OutlookAssistant] render', { isAuthenticated, isOutlookMode, isLoadingContext });
 
-  const handleNewEmail = (template: TemplateData) => {
-    sendToOutlook('OUTLOOK_NEW_EMAIL', {
-      to: [],
-      subject: template.subject || 'Re: ' + (emailContext?.subject || ''),
-      content: template.content
-    });
-  };
+  if (isAuthenticated === null) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <p className="text-sm text-gray-600">Checking authentication...</p>
+      </div>
+    );
+  }
+
+  // While we know auth status but haven't determined outlook mode yet, keep loading
+  if (isAuthenticated && isLoadingContext && !isOutlookMode) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (isOutlookMode) {
     return (
-      <div className="h-screen flex flex-col">
+      <div className="h-screen flex flex-col bg-background">
         {/* Outlook Header */}
-        <div className="border-b bg-background/95 backdrop-blur px-4 py-3">
+        <div className="border-b bg-background/95 backdrop-blur px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
               <span className="font-semibold">Email Assistant</span>
             </div>
-            {emailContext && (
-              <div className="text-xs text-muted-foreground">
-                {emailContext.subject ? `Re: ${emailContext.subject}` : 'New Email'}
+            {emailContext?.subject && (
+              <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={emailContext.subject}>
+                {emailContext.subject}
               </div>
             )}
           </div>
         </div>
 
-        {/* Chat Interface with Outlook Actions */}
-        <div className="flex-1 relative">
+        {/* Chat Interface */}
+        <div className="flex-1 relative overflow-hidden">
+          {isLoadingContext && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Loading email context...</span>
+              </div>
+            </div>
+          )}
           <Assistant />
         </div>
       </div>
