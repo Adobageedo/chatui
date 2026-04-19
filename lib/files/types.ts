@@ -1,5 +1,6 @@
 export type FileItemType = "file" | "folder";
 export type FileScope = "user" | "org";
+export type SyncStatus = "pending" | "processing" | "synced" | "error" | "not_applicable";
 
 /** Generic key-value metadata entry attached to any file or folder.
  *  Works across all domains (leases, HSQE, reporting, etc.). */
@@ -59,6 +60,27 @@ export type FileItem = {
   storageBucket?: string;
   /** Path within the storage bucket */
   storagePath?: string;
+
+  // ── Sync / Qdrant fields ──
+  /** Current sync status with vector index */
+  syncStatus?: SyncStatus;
+  /** Error message if sync failed */
+  syncError?: string;
+  /** Timestamp of last successful sync */
+  syncedAt?: string;
+  /** SHA-256 hash of file content for change detection */
+  contentHash?: string;
+  /** Number of chunks indexed in Qdrant */
+  chunkCount?: number;
+};
+
+export type SyncStats = {
+  totalFiles: number;
+  synced: number;
+  pending: number;
+  processing: number;
+  error: number;
+  totalChunks: number;
 };
 
 export type SortField = "name" | "modifiedAt" | "size" | "type";

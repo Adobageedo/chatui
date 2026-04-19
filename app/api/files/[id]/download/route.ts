@@ -15,6 +15,7 @@ export async function GET(
 
     const item = await fileRepository.getItem(id);
     if (!item) {
+      console.error(`[download] Item ${id} not found in DB`);
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (item.type === "folder") {
@@ -23,20 +24,27 @@ export async function GET(
 
     // If the file has a storage path, generate a signed URL
     if (item.storageBucket && item.storagePath) {
-      const url = await storageService.getSignedDownloadUrl({
-        bucket: item.storageBucket,
-        path: item.storagePath,
-      });
-      return NextResponse.json({ url });
+      try {
+        const url = await storageService.getSignedDownloadUrl({
+          bucket: item.storageBucket,
+          path: item.storagePath,
+        });
+        return NextResponse.json({ url });
+      } catch (err) {
+        console.error(`[download] Stored path failed — bucket: ${item.storageBucket}, path: ${item.storagePath}`, err);
+      }
+    } else {
+      console.error(`[download] Item ${id} has no storageBucket/storagePath — bucket: ${item.storageBucket}, path: ${item.storagePath}`);
     }
 
     // Fallback: resolve location from item metadata
     const location = storageService.resolveLocation(item, auth.userId, orgId);
+    console.error(`[download] Fallback location — bucket: ${location.bucket}, path: ${location.path}`);
     try {
       const url = await storageService.getSignedDownloadUrl(location);
       return NextResponse.json({ url });
-    } catch {
-      // File doesn't exist in storage yet (e.g. metadata-only entry)
+    } catch (err) {
+      console.error(`[download] Fallback also failed for item ${id}`, err);
       return NextResponse.json({ error: "File not available for download" }, { status: 404 });
     }
   } catch (err: unknown) {

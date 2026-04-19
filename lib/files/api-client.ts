@@ -4,7 +4,7 @@
  * (e.g. Supabase) only requires changing this file.
  */
 
-import { FileItem, MetadataEntry } from "./types";
+import { FileItem, MetadataEntry, SyncStats } from "./types";
 
 const BASE = "/api/files";
 
@@ -157,6 +157,20 @@ export async function uploadFiles(
     items.push(await uploadFile(file, parentId));
   }
   return items;
+}
+
+// ── Sync / Qdrant ────────────────────────────────────────────────────────────
+
+export async function resyncFile(id: string): Promise<FileItem> {
+  return request(`${BASE}/${id}/resync`, { method: "POST" });
+}
+
+export async function fetchSyncStats(): Promise<SyncStats> {
+  return request(`${BASE}/sync/stats`);
+}
+
+export async function triggerSync(): Promise<{ message: string; processed: number; fileIds: string[] }> {
+  return request(`${BASE}/sync/trigger`, { method: "POST" });
 }
 
 // ── Download (signed URL from Supabase Storage) ─────────────────────────────

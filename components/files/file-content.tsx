@@ -31,6 +31,7 @@ import {
 import { useDesktopDrop } from "../../hooks/files/use-desktop-drop";
 import { SortField } from "../../lib/files/types";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { SyncStatusIcon, FolderSyncBadge } from "./sync-status-icon";
 
 // ── Drag ghost ────────────────────────────────────────────────────────────────
 
@@ -273,6 +274,10 @@ function FileListRow({ item }: { item: FileItem }) {
             {item.shared && (
               <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
+            {item.type === "file" && (
+              <SyncStatusIcon status={item.syncStatus} syncError={item.syncError} />
+            )}
+            {item.type === "folder" && <FolderSyncIndicator folderId={item.id} />}
           </div>
         </TableCell>
         <TableCell className="text-muted-foreground">
@@ -406,6 +411,10 @@ function FileGridCard({ item }: { item: FileItem }) {
               {formatFileSize(item.size)}
             </Badge>
           )}
+          {item.type === "file" && (
+            <SyncStatusIcon status={item.syncStatus} syncError={item.syncError} />
+          )}
+          {item.type === "folder" && <FolderSyncIndicator folderId={item.id} />}
           {item.shared && (
             <Users className="h-3 w-3 text-muted-foreground" />
           )}
@@ -413,6 +422,12 @@ function FileGridCard({ item }: { item: FileItem }) {
       </div>
     </FileContextMenu>
   );
+}
+
+function FolderSyncIndicator({ folderId }: { folderId: string }) {
+  const { getFolderSyncSummary } = useFileManagerStore();
+  const { status, synced, total } = getFolderSyncSummary(folderId);
+  return <FolderSyncBadge status={status} synced={synced} total={total} />;
 }
 
 function DropOverlay() {

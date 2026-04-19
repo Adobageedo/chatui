@@ -22,6 +22,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { FolderOpen, Loader2 } from "lucide-react";
+import { SyncStatusBar } from "../../components/files/sync-status-bar";
 
 function FileManagerInner() {
   useFileKeyboardShortcuts();
@@ -52,7 +53,7 @@ function FileManagerInner() {
             <FileTree />
           </SidebarContent>
           <SidebarFooter className="border-t p-0">
-            {/* <StorageIndicator /> */}
+            <SyncStatusBar />
           </SidebarFooter>
         </Sidebar>
 

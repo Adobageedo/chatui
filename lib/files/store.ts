@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FileItem, SortField, SortDirection, ViewMode, BreadcrumbItem, ClipboardState } from "./types";
+import { FileItem, SortField, SortDirection, ViewMode, BreadcrumbItem, ClipboardState, SyncStatus } from "./types";
 import * as api from "./api-client";
 import { toast } from "sonner";
 import { useUploadProgress } from "../../hooks/files/use-upload-progress";
@@ -58,6 +58,10 @@ interface FileManagerState {
   endDrag: () => void;
   toggleExpandFolder: (folderId: string) => void;
   canDropInto: (targetFolderId: string) => boolean;
+
+  // Sync
+  resyncFile: (id: string) => void;
+  getFolderSyncSummary: (folderId: string) => { status: SyncStatus; synced: number; total: number };
 
   // Derived
   getBreadcrumbs: () => BreadcrumbItem[];
@@ -605,5 +609,71 @@ export const useFileManagerStore = create<FileManagerState>((set, get) => ({
 
   isItemLocked: (id: string) => {
     return !!get().files[id]?.locked;
+  },
+
+  // ── Sync ──────────────────────────────────────────────────────────────────
+
+  resyncFile: (id) => {
+    const state = get();
+    const item = state.files[id];
+    if (!item || item.type === "folder") return;
+
+    // Optimistic: set to processing
+    const newFiles = { ...state.files };
+    newFiles[id] = { ...item, syncStatus: "processing", syncError: undefined };
+    set({ files: newFiles });
+
+    api.resyncFile(id)
+      .then((updated) => {
+        const files = { ...get().files };
+        files[id] = { ...files[id], ...updated };
+        set({ files });
+        toast.success(`Re-indexing "${item.name}"…`);
+
+        // Mock: simulate completion after 3s
+        setTimeout(() => {
+          const f = { ...get().files };
+          if (f[id]?.syncStatus === "processing") {
+            f[id] = { ...f[id], syncStatus: "synced", syncedAt: new Date().toISOString(), syncError: undefined };
+            set({ files: f });
+          }
+        }, 3000);
+      })
+      .catch(() => {
+        const files = { ...get().files };
+        files[id] = { ...files[id], syncStatus: "error", syncError: "Resync failed" };
+        set({ files });
+        toast.error(`Failed to re-index "${item.name}"`);
+      });
+  },
+
+  getFolderSyncSummary: (folderId) => {
+    const state = get();
+    const folder = state.files[folderId];
+    if (!folder?.children) return { status: "not_applicable" as SyncStatus, synced: 0, total: 0 };
+
+    // Collect all descendant files recursively
+    const collectFiles = (id: string): FileItem[] => {
+      const item = state.files[id];
+      if (!item) return [];
+      if (item.type === "file") return [item];
+      return (item.children ?? []).flatMap(collectFiles);
+    };
+
+    const files = (folder.children ?? []).flatMap((childId) => collectFiles(childId));
+    const indexable = files.filter((f) => f.syncStatus !== "not_applicable");
+    const synced = indexable.filter((f) => f.syncStatus === "synced").length;
+    const total = indexable.length;
+
+    let status: SyncStatus = "not_applicable";
+    if (total > 0) {
+      if (indexable.some((f) => f.syncStatus === "error")) status = "error";
+      else if (indexable.some((f) => f.syncStatus === "processing")) status = "processing";
+      else if (indexable.some((f) => f.syncStatus === "pending")) status = "pending";
+      else if (synced === total) status = "synced";
+      else status = "pending";
+    }
+
+    return { status, synced, total };
   },
 }));

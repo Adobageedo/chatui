@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import type { FileItem, MetadataEntry, RootFolderRegistry } from "@/lib/files/types";
+import type { FileItem, MetadataEntry, RootFolderRegistry, SyncStatus } from "@/lib/files/types";
+import { storageService } from "./storage.service";
 
 // ── DB row types (snake_case) ───────────────────────────────────────────────
 
@@ -23,6 +24,12 @@ interface FileItemRow {
   metadata: MetadataEntry[];
   created_at: string;
   updated_at: string;
+  // Sync fields (nullable until migration is applied)
+  sync_status?: string | null;
+  sync_error?: string | null;
+  synced_at?: string | null;
+  content_hash?: string | null;
+  chunk_count?: number | null;
 }
 
 interface RootRegistryRow {
@@ -59,6 +66,12 @@ function mapRow(row: FileItemRow): FileItem {
     ownerId: row.owner_id,
     storageBucket: row.storage_bucket ?? undefined,
     storagePath: row.storage_path ?? undefined,
+    // Sync fields (populated by DB trigger on INSERT)
+    syncStatus: (row.sync_status as SyncStatus) ?? "pending",
+    syncError: row.sync_error ?? undefined,
+    syncedAt: row.synced_at ?? undefined,
+    contentHash: row.content_hash ?? undefined,
+    chunkCount: row.chunk_count ?? 0,
   };
 }
 
@@ -260,6 +273,11 @@ export class FileRepository {
       metadata: MetadataEntry[];
       storage_bucket: string;
       storage_path: string;
+      sync_status: string;
+      sync_error: string | null;
+      synced_at: string | null;
+      content_hash: string | null;
+      chunk_count: number;
     }>
   ): Promise<FileItem> {
     const supabase = await createClient();
@@ -334,6 +352,26 @@ export class FileRepository {
       } while (existingNames.has(dupName));
     }
 
+    // Copy storage file if the original has one
+    let storageBucket: string | undefined;
+    let storagePath: string | undefined;
+
+    if (original.type === "file" && original.storageBucket && original.storagePath) {
+      const fromLocation = { bucket: original.storageBucket, path: original.storagePath };
+      // Build destination path: replace old filename with new name in the same directory
+      const pathParts = original.storagePath.split("/");
+      pathParts[pathParts.length - 1] = dupName;
+      const toLocation = { bucket: original.storageBucket, path: pathParts.join("/") };
+
+      try {
+        await storageService.copyFile(fromLocation, toLocation);
+        storageBucket = toLocation.bucket;
+        storagePath = toLocation.path;
+      } catch {
+        // Storage copy failed — still create DB record, download just won't work
+      }
+    }
+
     return this.createItem({
       name: dupName,
       type: original.type,
@@ -346,7 +384,69 @@ export class FileRepository {
       size: original.size,
       mimeType: original.mimeType,
       metadata: original.metadata,
+      storageBucket,
+      storagePath,
     });
+  }
+  // ── Sync helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Update sync status for a single item.
+   * Used by the sync pipeline and the resync endpoint.
+   */
+  async updateSyncStatus(
+    id: string,
+    status: string,
+    extra?: { syncError?: string | null; syncedAt?: string | null; contentHash?: string | null; chunkCount?: number }
+  ): Promise<FileItem> {
+    return this.updateItem(id, {
+      sync_status: status,
+      sync_error: extra?.syncError ?? null,
+      synced_at: extra?.syncedAt ?? null,
+      content_hash: extra?.contentHash ?? null,
+      chunk_count: extra?.chunkCount ?? undefined,
+    });
+  }
+
+  /**
+   * Get all files with sync_status = 'pending' (for the pipeline to pick up).
+   */
+  async getPendingSyncItems(limit = 50): Promise<FileItem[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("file_items")
+      .select("*")
+      .eq("sync_status", "pending")
+      .eq("type", "file")
+      .order("created_at", { ascending: true })
+      .limit(limit);
+
+    if (error) throw new Error(`Failed to fetch pending sync items: ${error.message}`);
+    return (data ?? []).map(mapRow);
+  }
+
+  /**
+   * Get all descendant file IDs under a folder (recursive via DB).
+   * Used for bulk sync operations (e.g. folder delete → remove from Qdrant).
+   */
+  async getDescendantFileIds(folderId: string): Promise<string[]> {
+    const supabase = await createClient();
+    // Use a recursive CTE via rpc, or fallback to fetching all items under the root
+    // For now, use a simple recursive approach in JS
+    const result: string[] = [];
+    const queue = [folderId];
+    while (queue.length > 0) {
+      const parentId = queue.shift()!;
+      const children = await this.getChildren(parentId);
+      for (const child of children) {
+        if (child.type === "file") {
+          result.push(child.id);
+        } else {
+          queue.push(child.id);
+        }
+      }
+    }
+    return result;
   }
 }
 
