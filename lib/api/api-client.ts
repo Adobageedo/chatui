@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client";
+
 /**
  * API Client
  * Centralized HTTP client for all API requests with auth handling
@@ -15,6 +17,19 @@ class ApiClient {
   }
 
   /**
+   * Get auth token from Supabase session
+   */
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.access_token || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Generic fetch wrapper with error handling
    */
   private async request<T>(
@@ -22,10 +37,17 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     try {
+      // Get auth token for Outlook embedded browser support
+      const token = await this.getAuthToken();
+      const authHeaders: Record<string, string> = token
+        ? { "Authorization": `Bearer ${token}` }
+        : {};
+
       const response = await fetch(url, {
         ...options,
         headers: {
           "Content-Type": "application/json",
+          ...authHeaders,
           ...options.headers,
         },
       });
