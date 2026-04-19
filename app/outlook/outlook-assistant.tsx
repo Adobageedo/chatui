@@ -21,8 +21,6 @@ export function OutlookAssistant() {
   const [isLoadingContext, setIsLoadingContext] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  // Track if we've already authenticated via tokens to prevent override
-  const [hasProcessedTokens, setHasProcessedTokens] = useState(false);
 
   useEffect(() => {
     console.log('[OutlookAssistant] starting auth check...');
@@ -34,13 +32,11 @@ export function OutlookAssistant() {
       if (hash && hash.includes('access_token')) {
         console.log('[OutlookAssistant] Found tokens in URL hash, setting session...');
         try {
-          // Parse hash params
           const params = new URLSearchParams(hash.substring(1));
           const access_token = params.get('access_token');
           const refresh_token = params.get('refresh_token');
 
           if (access_token) {
-            // Set the session from tokens
             const { data, error } = await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || '',
@@ -48,12 +44,14 @@ export function OutlookAssistant() {
 
             if (error) {
               console.error('[OutlookAssistant] Failed to set session:', error);
+              setIsAuthenticated(false);
             } else if (data.session) {
               console.log('[OutlookAssistant] Session established from tokens');
-              setHasProcessedTokens(true);
               setIsAuthenticated(true);
-              return;
+            } else {
+              setIsAuthenticated(false);
             }
+            return;
           }
         } catch (err) {
           console.error('[OutlookAssistant] Error parsing tokens:', err);
@@ -82,32 +80,15 @@ export function OutlookAssistant() {
     };
 
     checkAuth();
-
-    // Listen for auth state changes - but don't override if we processed tokens
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
-      console.log('[OutlookAssistant] auth state change:', event, !!session);
-      // Only update if we haven't already authenticated via tokens
-      // (INITIAL_SESSION false can come after we already set from tokens)
-      if (!hasProcessedTokens) {
-        if (session) {
-          setIsAuthenticated(true);
-        } else if (event === 'INITIAL_SESSION') {
-          // Only mark as false on initial check, not if we lose session later
-          setIsAuthenticated(false);
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [hasProcessedTokens]);
+    // No onAuthStateChange listener - avoiding race conditions with singleton client
+  }, []);
 
   useEffect(() => {
-    // Only redirect if not authenticated AND we haven't processed tokens
-    // (If we processed tokens but isAuthenticated is false, something else is wrong)
-    if (isAuthenticated === false && !hasProcessedTokens) {
+    // Redirect to signin if not authenticated
+    if (isAuthenticated === false) {
       window.location.href = "/outlook/signin";
     }
-  }, [isAuthenticated, hasProcessedTokens]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
