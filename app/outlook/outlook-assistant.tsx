@@ -84,7 +84,7 @@ export function OutlookAssistant() {
     checkAuth();
 
     // Listen for auth state changes - but don't override if we processed tokens
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       console.log('[OutlookAssistant] auth state change:', event, !!session);
       // Only update if we haven't already authenticated via tokens
       // (INITIAL_SESSION false can come after we already set from tokens)
