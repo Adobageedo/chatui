@@ -21,6 +21,9 @@ export function OutlookAssistant() {
   const [isLoadingContext, setIsLoadingContext] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
+  // Track if we've already authenticated via tokens to prevent override
+  const [hasProcessedTokens, setHasProcessedTokens] = useState(false);
+
   useEffect(() => {
     console.log('[OutlookAssistant] starting auth check...');
     const supabase = createClient();
@@ -47,8 +50,7 @@ export function OutlookAssistant() {
               console.error('[OutlookAssistant] Failed to set session:', error);
             } else if (data.session) {
               console.log('[OutlookAssistant] Session established from tokens');
-              // Clear hash so tokens aren't in URL
-              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              setHasProcessedTokens(true);
               setIsAuthenticated(true);
               return;
             }
@@ -81,22 +83,31 @@ export function OutlookAssistant() {
 
     checkAuth();
 
-    // Listen for auth state changes
+    // Listen for auth state changes - but don't override if we processed tokens
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[OutlookAssistant] auth state change:', event, !!session);
-      if (session) {
-        setIsAuthenticated(true);
+      // Only update if we haven't already authenticated via tokens
+      // (INITIAL_SESSION false can come after we already set from tokens)
+      if (!hasProcessedTokens) {
+        if (session) {
+          setIsAuthenticated(true);
+        } else if (event === 'INITIAL_SESSION') {
+          // Only mark as false on initial check, not if we lose session later
+          setIsAuthenticated(false);
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [hasProcessedTokens]);
 
   useEffect(() => {
-    if (isAuthenticated === false) {
+    // Only redirect if not authenticated AND we haven't processed tokens
+    // (If we processed tokens but isAuthenticated is false, something else is wrong)
+    if (isAuthenticated === false && !hasProcessedTokens) {
       window.location.href = "/outlook/signin";
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasProcessedTokens]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
