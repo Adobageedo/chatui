@@ -5,6 +5,7 @@ import { getTodayDateSchema, executeGetTodayDate } from "@/lib/tools/backend/dat
 import { APP_CONFIG } from '@/config';
 import { ValidationError } from "../shared/api-error";
 import type { ChatRequest, ChatStreamOptions } from "./chat.types";
+import { convertAssistantUIToolsToAISDK } from "./tool-converter";
 
 /**
  * Chat Service Layer
@@ -99,6 +100,10 @@ export class ChatService {
 
   /**
    * Get tool definitions
+   * 
+   * NOTE: These are backend-defined tools as fallback.
+   * Ideally, tools should come from frontend via context.tools
+   * and execute on the frontend with LocalRuntime.
    */
   private getTools() {
     return {
@@ -135,11 +140,29 @@ export class ChatService {
 
     const aiMessages = this.convertMessages(request.messages, options.emailContext);
     
+    // Log frontend tools for debugging
+    if (options.frontendTools) {
+      console.log('[ChatService] Frontend tools received:', Object.keys(options.frontendTools));
+      // Attempt to convert frontend tools
+      const convertedTools = convertAssistantUIToolsToAISDK(options.frontendTools);
+      if (convertedTools) {
+        console.log('[ChatService] Frontend tools converted successfully');
+      } else {
+        console.log('[ChatService] Using backend tools as fallback (conversion not yet implemented)');
+      }
+    } else {
+      console.log('[ChatService] No frontend tools provided, using backend tools');
+    }
+    
     // Use reasoning model (o1-mini) when reasoning is enabled
     // Otherwise use the default or specified model
     const model = options.reasoningEnabled 
       ? "gpt-5-nano" 
       : (options.model || this.defaultModel);
+
+    // TODO: Use convertedTools when serialization is implemented
+    // For now, use backend-defined tools
+    const tools = this.getTools();
 
     const result = streamText({
       model: openai(model),
@@ -147,7 +170,7 @@ export class ChatService {
       stopWhen: stepCountIs(options.maxSteps || this.maxSteps),
       temperature: options.temperature,
       // Note: o1 models don't support tools, so only include if not using reasoning
-      ...(options.reasoningEnabled ? {} : { tools: this.getTools() }),
+      ...(options.reasoningEnabled ? {} : { tools }),
       // Add reasoning-specific provider options
       ...(options.reasoningEnabled ? {
         providerOptions: {

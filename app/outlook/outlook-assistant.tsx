@@ -5,6 +5,9 @@ import { Assistant } from "../chat/assistant";
 import { Mail, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+// Office.js global type declaration
+declare const Office: any;
+
 interface EmailContext {
   subject?: string;
   from?: string;
@@ -20,7 +23,25 @@ export function OutlookAssistant() {
   const [emailContext, setEmailContext] = useState<EmailContext | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isOfficeReady, setIsOfficeReady] = useState(false);
 
+  useEffect(() => {
+    // Check if Office.js is available and ready
+    if (typeof window !== 'undefined') {
+      if (typeof Office !== 'undefined' && Office.context) {
+        // Office.js already loaded
+        setIsOfficeReady(true);
+      } else if (typeof Office !== 'undefined') {
+        // Office.js exists but not ready
+        Office.onReady(() => {
+          setIsOfficeReady(true);
+        });
+      } else {
+        // Not in Office context (regular browser)
+        setIsOfficeReady(true);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     console.log('[OutlookAssistant] starting auth check...');
@@ -116,7 +137,17 @@ export function OutlookAssistant() {
     }
   }, [isAuthenticated]);
 
-  console.log('[OutlookAssistant] render', { isAuthenticated, isOutlookMode, isLoadingContext });
+  console.log('[OutlookAssistant] render', { isAuthenticated, isOutlookMode, isLoadingContext, isOfficeReady });
+
+  // Wait for Office.js to be ready
+  if (!isOfficeReady) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <p className="text-sm text-gray-600">Loading Office.js...</p>
+      </div>
+    );
+  }
 
   if (isAuthenticated === null) {
     return (

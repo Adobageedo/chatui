@@ -2,8 +2,17 @@ import { chatService } from "@/service/api/chat/chat.service";
 import { ApiResponseBuilder } from "@/service/api/shared/api-response";
 import { ApiError } from "@/service/api/shared/api-error";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
+import { handleCors } from "@/lib/api/cors";
 
 export const maxDuration = 30;
+
+/**
+ * OPTIONS /api/chat
+ * Handle CORS preflight
+ */
+export async function OPTIONS(request: Request) {
+  return handleCors(request) || new Response(null, { status: 200 });
+}
 
 /**
  * Chat endpoint for LocalRuntime
@@ -14,7 +23,7 @@ export async function POST(req: Request) {
     // Verify authentication
     await AuthMiddleware.verifyAuth();
     
-    const { messages, reasoningEnabled = false, emailContext = null, tools =null } = await req.json();
+    const { messages, reasoningEnabled = false, emailContext = null, tools = null } = await req.json();
 
     // Delegate to service layer
     return await chatService.streamChat(

@@ -37,7 +37,7 @@ function getEmailContext(): any | null {
  * - Reasoning mode support (uses o1-mini when enabled)
  */
 export const chatModelAdapter: ChatModelAdapter = {
-  async *run({ messages, abortSignal }) {
+  async *run({ messages, abortSignal, context }) {
     // Merge attachment content into message content
     const processedMessages = messages.map((msg: any) => {
       // Check if message has attachments with content
@@ -71,6 +71,7 @@ export const chatModelAdapter: ChatModelAdapter = {
         messages: processedMessages,
         reasoningEnabled,
         emailContext,
+        tools: context.tools, // Pass tools from context to backend
       }),
       signal: abortSignal,
     });

@@ -8,13 +8,27 @@
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
+        html, body, iframe {
             width: 100%; height: 100%;
+            border: 0;
+            overflow: hidden;
+        }
+        body {
             font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
             background: #faf9f8;
-            display: flex; align-items: center; justify-content: center;
         }
-        .container { text-align: center; padding: 20px; }
+        #app-frame {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
         .spinner {
             width: 32px; height: 32px;
             border: 3px solid rgba(0,120,212,0.2);
@@ -24,110 +38,59 @@
             margin: 0 auto 16px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .status { font-size: 14px; color: #605e5c; margin-bottom: 8px; }
-        .error { color: #a4262c; }
-        .retry { margin-top: 12px; padding: 8px 16px; background: #0078d4; color: #fff;
-                 border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .status { font-size: 14px; color: #605e5c; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="spinner" id="spinner"></div>
-        <div class="status" id="status">Initializing...</div>
-        <button class="retry" id="retry-btn" style="display:none" onclick="window.location.reload()">Retry</button>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="status">Loading...</div>
     </div>
+    <iframe id="app-frame" style="display:none;"></iframe>
 
     <script>
-        // Use the same origin the taskpane was served from.
-        // When served via Next.js (localhost or ngrok), this is the Next.js server itself.
         const APP_BASE_URL = window.location.origin;
 
-        function setStatus(msg) {
-            document.getElementById('status').textContent = msg;
-        }
-
-        function showError(msg) {
-            document.getElementById('spinner').style.display = 'none';
-            const s = document.getElementById('status');
-            s.textContent = msg;
-            s.classList.add('error');
-            document.getElementById('retry-btn').style.display = 'inline-block';
-        }
-
-        function navigateToApp(context) {
-            // Store email context so the Next.js app can read it on load
-            try {
-                sessionStorage.setItem('outlook_email_context', JSON.stringify(context));
-            } catch(e) {}
-            setStatus('Opening assistant...');
-            // ngrok-skip-browser-warning bypasses the ngrok browser warning page
-            window.location.href = APP_BASE_URL + '/outlook?outlook=true&ngrok-skip-browser-warning=true';
-        }
-
-        function extractAndNavigate() {
-            // Standalone / no email open
-            if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
-                setStatus('No email context — opening assistant...');
-                navigateToApp({ subject: '', from: '', to: [], body: '', itemType: 'message', cc: [], bcc: [] });
-                return;
-            }
-
-            const mailbox = Office.context.mailbox;
-            const item = mailbox.item;
-
-            if (!item) {
-                setStatus('No email selected — opening assistant...');
-                navigateToApp({ subject: '', from: '', to: [], body: '', itemType: 'message', cc: [], bcc: [] });
-                return;
-            }
-
-            setStatus('Reading email...');
-            const context = { itemType: item.itemType, subject: '', from: '', to: [], cc: [], bcc: [], body: '' };
-
-            if (item.from) context.from = item.from.emailAddress || item.from.displayName || '';
-            if (item.to)  context.to  = item.to.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
-            if (item.cc)  context.cc  = item.cc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
-            if (item.bcc) context.bcc = item.bcc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
-
-            // Subject
-            function getBody(ctx) {
-                if (item.body && typeof item.body.getAsync === 'function') {
-                    item.body.getAsync('text', function(r) {
-                        if (r.status === Office.AsyncResultStatus.Succeeded) ctx.body = r.value;
-                        navigateToApp(ctx);
-                    });
-                } else {
-                    navigateToApp(ctx);
+        function storeEmailContext() {
+            // Extract email context and store in sessionStorage
+            if (typeof Office !== 'undefined' && Office.context?.mailbox?.item) {
+                const item = Office.context.mailbox.item;
+                const context = {
+                    itemType: item.itemType,
+                    subject: typeof item.subject === 'string' ? item.subject : '',
+                    from: item.from?.emailAddress || item.from?.displayName || '',
+                    to: item.to?.map(r => r.emailAddress || r.displayName || '').filter(Boolean) || [],
+                    cc: item.cc?.map(r => r.emailAddress || r.displayName || '').filter(Boolean) || [],
+                    bcc: item.bcc?.map(r => r.emailAddress || r.displayName || '').filter(Boolean) || [],
+                    body: '',
+                };
+                
+                try {
+                    sessionStorage.setItem('outlook_email_context', JSON.stringify(context));
+                } catch(e) {
+                    console.warn('Failed to store email context:', e);
                 }
             }
-
-            if (typeof item.subject === 'string') {
-                context.subject = item.subject;
-                getBody(context);
-            } else if (item.subject && typeof item.subject.getAsync === 'function') {
-                item.subject.getAsync(function(r) {
-                    if (r.status === Office.AsyncResultStatus.Succeeded) context.subject = r.value;
-                    getBody(context);
-                });
-            } else {
-                getBody(context);
-            }
         }
 
-        // Boot
+        function loadApp() {
+            storeEmailContext();
+            
+            const frame = document.getElementById('app-frame');
+            const loading = document.getElementById('loading');
+            
+            frame.src = APP_BASE_URL + '/outlook';
+            frame.style.display = 'block';
+            loading.style.display = 'none';
+        }
+
+        // Initialize when Office.js is ready
         if (typeof Office === 'undefined') {
-            setStatus('Loading without Outlook...');
-            setTimeout(extractAndNavigate, 300);
+            setTimeout(loadApp, 300);
         } else {
-            setStatus('Waiting for Outlook...');
-            Office.onReady(function(info) {
-                extractAndNavigate();
+            Office.onReady(function() {
+                loadApp();
             });
-            // Safety timeout
-            setTimeout(function() {
-                setStatus('Timeout — opening assistant...');
-                navigateToApp({ subject: '', from: '', to: [], body: '', itemType: 'message', cc: [], bcc: [] });
-            }, 8000);
         }
     </script>
 </body>

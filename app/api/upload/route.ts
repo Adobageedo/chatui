@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { storageApiService } from "@/service/api/storage/storage.service";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
 import { ApiError, ValidationError } from "@/service/api/shared/api-error";
+import { handleCors, corsHeaders } from "@/lib/api/cors";
 
 // Route segment config for file uploads
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/**
+ * OPTIONS /api/upload
+ * Handle CORS preflight
+ */
+export async function OPTIONS(request: Request) {
+  return handleCors(request) || new Response(null, { status: 200 });
+}
 
 /**
  * POST /api/upload
@@ -30,7 +39,14 @@ export async function POST(req: Request) {
       file,
     });
 
-    return NextResponse.json(result);
+    const response = NextResponse.json(result);
+    
+    const origin = req.headers.get("origin");
+    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    return response;
   } catch (error) {
     console.error("Upload API error:", error);
 

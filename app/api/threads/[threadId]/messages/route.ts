@@ -2,6 +2,15 @@ import { messageService } from "@/service/api/threads/message.service";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
 import { NextResponse } from "next/server";
 import { ApiError } from "@/service/api/shared/api-error";
+import { handleCors, corsHeaders } from "@/lib/api/cors";
+
+/**
+ * OPTIONS /api/threads/[threadId]/messages
+ * Handle CORS preflight
+ */
+export async function OPTIONS(request: Request) {
+  return handleCors(request) || new Response(null, { status: 200 });
+}
 
 /**
  * GET /api/threads/[threadId]/messages
@@ -16,7 +25,14 @@ export async function GET(
     const { threadId } = await params;
 
     const result = await messageService.listMessages(threadId, auth.userId);
-    return NextResponse.json(result);
+    const response = NextResponse.json(result);
+    
+    const origin = req.headers.get("origin");
+    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    return response;
   } catch (error) {
     console.error("List messages error:", error);
 
@@ -42,7 +58,14 @@ export async function POST(
     const body = await req.json();
 
     const result = await messageService.createMessage(threadId, auth.userId, body);
-    return NextResponse.json(result);
+    const response = NextResponse.json(result);
+    
+    const origin = req.headers.get("origin");
+    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    return response;
   } catch (error) {
     console.error("Create message error:", error);
 

@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ENV, APP_CONFIG } from '@/config';
 
 export async function middleware(request: NextRequest) {
+  // Skip auth for OPTIONS preflight requests
+  if (request.method === "OPTIONS") {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
