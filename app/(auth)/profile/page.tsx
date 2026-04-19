@@ -1,26 +1,50 @@
 "use client";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { User, Bell, Shield, Palette, LogOut, Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Bell, Shield, Palette, LogOut } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Navbar } from "@/layout/navbar";
 import { useProfile } from "@/hooks/useProfile";
-import { ProfileHeader } from "@/components/profile/profile-header";
-import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
 import { ProfileTab } from "@/components/profile/tabs/profile-tab";
 import { NotificationsTab } from "@/components/profile/tabs/notifications-tab";
 import { PrivacyTab } from "@/components/profile/tabs/privacy-tab";
 import { AppearanceTab } from "@/components/profile/tabs/appearance-tab";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-const TAB_ITEMS = [
-  { value: "profile", label: "Profile", icon: User },
-  { value: "notifications", label: "Notifications", icon: Bell },
-  { value: "privacy", label: "Privacy", icon: Shield },
-  { value: "appearance", label: "Appearance", icon: Palette },
+// ── Navigation items ─────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { value: "profile", label: "Profile", icon: User, description: "Personal info" },
+  { value: "notifications", label: "Notifications", icon: Bell, description: "Alerts & emails" },
+  { value: "privacy", label: "Privacy", icon: Shield, description: "Data & security" },
+  { value: "appearance", label: "Appearance", icon: Palette, description: "Theme & display" },
 ] as const;
 
+type Section = (typeof NAV_ITEMS)[number]["value"];
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function ProfilePage() {
+  const [activeSection, setActiveSection] = useState<Section>("profile");
+
   const {
     user,
     isLoading,
@@ -42,111 +66,141 @@ export default function ProfilePage() {
     handleSignOut,
   } = useProfile();
 
+  const initials = (profile.name?.[0] || user?.email?.[0] || "U").toUpperCase();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
-      {/* Navbar */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container max-w-7xl mx-auto px-4 py-4">
-          <Navbar />
-        </div>
-      </div>
-
-      {isLoading ? (
-        <ProfileSkeleton />
-      ) : (
-        <>
-          <ProfileHeader
-            name={profile.name}
-            email={user?.email}
-            avatarUrl={profile.avatar}
-            user={user}
-          />
-
-          {/* Main Content */}
-          <div className="container max-w-5xl mx-auto px-4 py-8">
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 h-auto p-1">
-                {TAB_ITEMS.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger
-                    key={value}
-                    value={value}
-                    className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-                  >
-                    <Icon className="size-4" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              <TabsContent value="profile">
-                <ProfileTab
-                  profile={profile}
-                  setProfile={setProfile}
-                  isSaving={isSaving}
-                  onSave={saveProfile}
-                  onDelete={deleteAccount}
-                />
-              </TabsContent>
-
-              <TabsContent value="notifications">
-                <NotificationsTab
-                  notifications={notifications}
-                  setNotifications={setNotifications}
-                  isSaving={isSaving}
-                  onSave={saveNotifications}
-                />
-              </TabsContent>
-
-              <TabsContent value="privacy">
-                <PrivacyTab
-                  privacy={privacy}
-                  setPrivacy={setPrivacy}
-                  isSaving={isSaving}
-                  onSave={savePrivacy}
-                  onRequestExport={requestDataExport}
-                />
-              </TabsContent>
-
-              <TabsContent value="appearance">
-                <AppearanceTab
-                  appearance={appearance}
-                  setAppearance={setAppearance}
-                  isSaving={isSaving}
-                  onSave={saveAppearance}
-                />
-              </TabsContent>
-            </Tabs>
-
-            {/* Danger Zone */}
-            <div className="mt-8">
-              <Card className="border-2 border-destructive/20">
-                <CardHeader>
-                  <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                  <CardDescription>Irreversible actions that affect your account</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-destructive">Sign Out</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        End your current session and return to login
-                      </p>
+    <SidebarProvider>
+      <div className="flex h-dvh w-full">
+        <Sidebar>
+          {/* ── Header ─────────────────────────────────────── */}
+          <SidebarHeader className="mb-2 border-b h-16">
+            <div className="flex items-center justify-between">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton size="lg">
+                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                      <Settings className="size-4" />
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleSignOut}
-                      className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-                    >
-                      <LogOut className="size-4" />
-                      Sign Out
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    <div className="flex flex-col gap-0.5 leading-none">
+                      <span className="font-semibold">Settings</span>
+                      <span className="text-xs text-muted-foreground">Account</span>
+                    </div>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </SidebarHeader>
+
+          {/* ── Navigation ─────────────────────────────────── */}
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Settings</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {NAV_ITEMS.map(({ value, label, icon: Icon }) => (
+                    <SidebarMenuItem key={value}>
+                      <SidebarMenuButton
+                        isActive={activeSection === value}
+                        onClick={() => setActiveSection(value)}
+                      >
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+
+          <SidebarRail />
+
+          {/* ── Footer ─────────────────────────────────────── */}
+          <SidebarFooter className="border-t">
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton size="lg" onClick={handleSignOut}>
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                    <LogOut className="size-4" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 leading-none">
+                    <span className="font-semibold text-destructive">Sign Out</span>
+                    <span className="text-xs text-muted-foreground">End session</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+
+        {/* ── Main content ───────────────────────────────── */}
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <Navbar hideLogo={true} />
+          </header>
+
+          {isLoading ? (
+            <div className="flex flex-1 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ScrollArea className="flex-1">
+              {/* Compact profile banner */}
+              <div className="border-b bg-muted/30 px-6 py-6">
+                <div className="mx-auto max-w-3xl flex items-center gap-4">
+                  <Avatar className="size-14 ring-2 ring-border">
+                    {profile.avatar && <AvatarImage src={profile.avatar} alt={profile.name || "Avatar"} />}
+                    <AvatarFallback className="text-lg font-bold">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg font-semibold truncate">{profile.name || "Your Profile"}</h1>
+                    <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active section content */}
+              <div className="mx-auto max-w-3xl px-6 py-8">
+                {activeSection === "profile" && (
+                  <ProfileTab
+                    profile={profile}
+                    setProfile={setProfile}
+                    isSaving={isSaving}
+                    onSave={saveProfile}
+                    onDelete={deleteAccount}
+                  />
+                )}
+                {activeSection === "notifications" && (
+                  <NotificationsTab
+                    notifications={notifications}
+                    setNotifications={setNotifications}
+                    isSaving={isSaving}
+                    onSave={saveNotifications}
+                  />
+                )}
+                {activeSection === "privacy" && (
+                  <PrivacyTab
+                    privacy={privacy}
+                    setPrivacy={setPrivacy}
+                    isSaving={isSaving}
+                    onSave={savePrivacy}
+                    onRequestExport={requestDataExport}
+                  />
+                )}
+                {activeSection === "appearance" && (
+                  <AppearanceTab
+                    appearance={appearance}
+                    setAppearance={setAppearance}
+                    isSaving={isSaving}
+                    onSave={saveAppearance}
+                  />
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }

@@ -18,6 +18,9 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -38,15 +41,21 @@ function FileManagerInner() {
     <SidebarProvider>
       <div className="flex h-dvh w-full">
         <Sidebar>
-          <SidebarHeader className="border-b px-4 py-3 h-16">
-            <div className="flex items-center gap-2">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <FolderOpen className="size-4" />
-              </div>
-              <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">File Manager</span>
-                <span className="text-xs text-muted-foreground">Explorer</span>
-              </div>
+          <SidebarHeader className="mb-2 border-b h-16">
+            <div className="flex items-center justify-between">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton size="lg">
+                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                      <FolderOpen className="size-4" />
+                    </div>
+                    <div className="flex flex-col gap-0.5 leading-none">
+                      <span className="font-semibold">File Manager</span>
+                      <span className="text-xs text-muted-foreground">Explorer</span>
+                    </div>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
             </div>
           </SidebarHeader>
           <SidebarContent>
