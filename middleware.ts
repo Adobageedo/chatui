@@ -48,10 +48,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Check if request is from Outlook mode (via referer or query param)
+  // Check if request is from Outlook mode (via custom header, referer, or query param)
+  const outlookModeHeader = request.headers.get('x-outlook-mode');
   const referer = request.headers.get('referer') || '';
   const searchParams = request.nextUrl.searchParams;
-  const isFromOutlook = referer.includes('/outlook') || pathname.startsWith('/outlook') || searchParams.get('outlook') === 'true';
+  const isFromOutlook = outlookModeHeader === 'true' || 
+                        referer.includes('/outlook') || 
+                        pathname.startsWith('/outlook') || 
+                        searchParams.get('outlook') === 'true';
   
   // Allow API requests from Outlook without authentication
   // Include all thread-related API routes (threads, messages, title, etc.)

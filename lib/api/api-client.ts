@@ -43,11 +43,21 @@ class ApiClient {
         ? { "Authorization": `Bearer ${token}` }
         : {};
 
+      // Detect if we're in Outlook mode
+      const isOutlookMode = typeof window !== 'undefined' && 
+        (window.location.pathname.startsWith('/outlook') || 
+         window.location.search.includes('outlook=true'));
+      
+      const outlookHeaders: Record<string, string> = isOutlookMode
+        ? { "X-Outlook-Mode": "true" }
+        : {};
+
       const response = await fetch(url, {
         ...options,
         headers: {
           "Content-Type": "application/json",
           ...authHeaders,
+          ...outlookHeaders,
           ...options.headers,
         },
       });

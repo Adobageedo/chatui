@@ -38,6 +38,9 @@ export function OutlookRuntimeProvider({
         transport: new AssistantChatTransport({
           api: "/api/chat",
           body: systemPrompt ? { system: systemPrompt } : undefined,
+          headers: {
+            'X-Outlook-Mode': 'true',
+          },
         }),
         adapters: {
           history: historyAdapter,
