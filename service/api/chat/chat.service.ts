@@ -1,7 +1,5 @@
 import { openai } from "@ai-sdk/openai";
-import { streamText, tool, stepCountIs, zodSchema } from "ai";
-import { z } from "zod";
-import { getTodayDateSchema, executeGetTodayDate } from "@/lib/tools/backend/date-tools";
+import { streamText, stepCountIs, tool, jsonSchema } from "ai";
 import { APP_CONFIG } from '@/config';
 import { ValidationError } from "../shared/api-error";
 import type { ChatRequest, ChatStreamOptions } from "./chat.types";
@@ -101,34 +99,54 @@ export class ChatService {
   /**
    * Get tool definitions
    * 
-   * NOTE: These are backend-defined tools as fallback.
-   * Ideally, tools should come from frontend via context.tools
-   * and execute on the frontend with LocalRuntime.
+   * IMPORTANT: These backend tools DON'T execute here!
+   * They ONLY tell the AI model which tools exist.
+   * 
+   * Flow:
+   * 1. Backend defines getTodayDate → Model knows it exists
+   * 2. Model generates tool-call part → Sent to frontend
+   * 3. Frontend LocalRuntime sees tool-call → Executes frontend tool.execute()
+   * 4. Frontend renders → Uses frontend tool.render()
+   * 
+   * The backend execute() function is ONLY called if you use AI SDK's
+   * automatic tool execution (which we DON'T). LocalRuntime handles it.
    */
-  private getTools() {
+  private getTools(): Record<string, any> {
     return {
-      // getTodayDate: tool({
-      //   description: "Get the current date and time",
-      //   inputSchema: zodSchema(getTodayDateSchema),
-      //   execute: executeGetTodayDate,
-      // }),
+      // AI SDK v6 uses `inputSchema` with `jsonSchema()` wrapper
+      // Tools only inform the model - LocalRuntime executes on frontend
+      getTodayDate: tool({
+        description: "Get the current date and time",
+        inputSchema: jsonSchema({
+          type: "object",
+          properties: {
+            format: {
+              type: "string",
+              enum: ["iso", "readable", "date-only", "time-only"],
+              description: "Date format to return",
+            },
+            timezone: {
+              type: "string",
+              description: "Timezone (e.g., 'UTC', 'America/New_York')",
+            },
+          },
+          additionalProperties: false,
+        } as any),
+      } as any),
       get_current_weather: tool({
         description: "Get the current weather in a given city",
-        inputSchema: zodSchema(
-          z.object({
-            city: z.string().describe("The city name"),
-          })
-        ),
-        execute: async ({ city }) => {
-          // In production, call a real weather API
-          return {
-            city,
-            temperature: 72,
-            condition: "sunny",
-            humidity: 65,
-          };
-        },
-      }),
+        inputSchema: jsonSchema({
+          type: "object",
+          properties: {
+            city: {
+              type: "string",
+              description: "The city name",
+            },
+          },
+          required: ["city"],
+          additionalProperties: false,
+        } as any),
+      } as any),
     };
   }
 
@@ -140,19 +158,40 @@ export class ChatService {
 
     const aiMessages = this.convertMessages(request.messages, options.emailContext);
     
-    // Log frontend tools for debugging
+    // Determine which tools to use
+    let tools: Record<string, any> = {};
+    
     if (options.frontendTools) {
       console.log('[ChatService] Frontend tools received:', Object.keys(options.frontendTools));
+      
       // Attempt to convert frontend tools
       const convertedTools = convertAssistantUIToolsToAISDK(options.frontendTools);
-      if (convertedTools) {
-        console.log('[ChatService] Frontend tools converted successfully');
+      
+      if (convertedTools && Object.keys(convertedTools).length > 0) {
+        console.log('[ChatService] ✓ Using converted frontend tools');
+        tools = convertedTools;
       } else {
-        console.log('[ChatService] Using backend tools as fallback (conversion not yet implemented)');
+        console.log('[ChatService] ⚠ Frontend tool conversion failed, using matching backend tools');
+        // Use only backend tools that match frontend tool names
+        const frontendToolNames = Object.keys(options.frontendTools);
+        const allBackendTools = this.getTools();
+        
+        for (const toolName of frontendToolNames) {
+          if (allBackendTools[toolName]) {
+            tools[toolName] = allBackendTools[toolName];
+            console.log(`[ChatService] → Enabled backend tool: ${toolName}`);
+          } else {
+            console.log(`[ChatService] ⚠ No backend tool found for: ${toolName}`);
+          }
+        }
       }
     } else {
-      console.log('[ChatService] No frontend tools provided, using backend tools');
+      console.log('[ChatService] No frontend tools provided, using all backend tools');
+      tools = this.getTools();
     }
+    
+    console.log('[ChatService] Final tools being sent to model:', Object.keys(tools));
+    console.log('[ChatService] Tool details:', JSON.stringify(tools, null, 2));
     
     // Use reasoning model (o1-mini) when reasoning is enabled
     // Otherwise use the default or specified model
@@ -160,17 +199,22 @@ export class ChatService {
       ? "gpt-5-nano" 
       : (options.model || this.defaultModel);
 
-    // TODO: Use convertedTools when serialization is implemented
-    // For now, use backend-defined tools
-    const tools = this.getTools();
+    // Only include tools if we have valid ones and not using reasoning mode
+    const hasTools = Object.keys(tools).length > 0;
+    const shouldIncludeTools = !options.reasoningEnabled && hasTools;
 
+    console.log('[ChatService] Model:', model, 'Should include tools:', shouldIncludeTools);
+    console.log('[ChatService] Tools object:', Object.keys(tools));
+
+    // CRITICAL: Use .chat() to force Chat Completions API instead of Responses API
+    // Pass tools in the tools parameter - AI SDK will handle serialization
     const result = streamText({
-      model: openai(model),
+      model: openai.chat(model),
       messages: aiMessages,
       stopWhen: stepCountIs(options.maxSteps || this.maxSteps),
       temperature: options.temperature,
-      // Note: o1 models don't support tools, so only include if not using reasoning
-      ...(options.reasoningEnabled ? {} : { tools }),
+      // Pass tools directly - AI SDK expects Record<string, Tool>
+      ...(shouldIncludeTools ? { tools } : {}),
       // Add reasoning-specific provider options
       ...(options.reasoningEnabled ? {
         providerOptions: {
@@ -180,6 +224,9 @@ export class ChatService {
           },
         },
       } : {}),
+      onFinish: (event) => {
+        console.log('[ChatService] Stream finished, tool calls:', event.toolCalls?.length || 0);
+      },
     });
 
     return result.toUIMessageStreamResponse({

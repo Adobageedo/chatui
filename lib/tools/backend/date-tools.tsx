@@ -10,6 +10,7 @@ export type GetTodayDateParams = z.infer<typeof getTodayDateSchema>;
 
 // Shared execute function
 export async function executeGetTodayDate({ format, timezone }: GetTodayDateParams) {
+  console.log('⚠️ BACKEND TOOL EXECUTING - This should NOT happen with LocalRuntime!');
   const now = new Date();
   
   let date = now;

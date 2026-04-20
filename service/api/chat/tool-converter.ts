@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { tool, zodSchema } from "ai";
 import { z } from "zod";
 
 /**
@@ -11,38 +11,89 @@ import { z } from "zod";
 
 export interface AssistantUITool {
   description?: string;
-  parameters: any; // Serialized Zod schema
+  parameters: any; // This will be a Zod schema object
   execute?: (args: any) => Promise<any>;
 }
 
 /**
  * Convert assistant-ui tools from context to AI SDK tool format
  * 
- * NOTE: This is a simplified version. Full implementation requires:
- * 1. Proper Zod schema serialization/deserialization
- * 2. Tool definition format conversion
+ * CURRENT IMPLEMENTATION:
+ * Due to Zod schema serialization complexity and AI SDK API constraints,
+ * we use a hybrid approach:
+ * 1. Frontend registers tools with useAui({ tools: Tools({ toolkit }) })
+ * 2. Frontend passes tool names to backend via context.tools
+ * 3. Backend uses matching tool definitions (must have same names)
+ * 4. Model calls tools, backend streams tool-call parts
+ * 5. Frontend LocalRuntime executes the frontend tool.execute() automatically
  * 
- * For now, we'll log the tools and return empty object.
- * Backend will use its own tool definitions temporarily.
+ * This is the recommended LocalRuntime pattern per documentation.
  * 
- * @param frontendTools - Tools from context.tools (serialized from frontend)
- * @returns Object with AI SDK tool definitions
+ * @param frontendTools - Tools from context.tools
+ * @returns null (signals to use backend tools with matching names)
  */
 export function convertAssistantUIToolsToAISDK(
   frontendTools: Record<string, AssistantUITool> | null | undefined
-) {
-  if (!frontendTools) {
+): null {
+  if (!frontendTools || Object.keys(frontendTools).length === 0) {
     console.log('[Tool Converter] No frontend tools provided');
     return null;
   }
 
-  console.log('[Tool Converter] Frontend tools received:', Object.keys(frontendTools));
-  console.log('[Tool Converter] Note: Full tool conversion not yet implemented');
-  console.log('[Tool Converter] Tools will execute on frontend via LocalRuntime');
+  const toolNames = Object.keys(frontendTools);
+  console.log('[Tool Converter] Frontend tools:', toolNames.join(', '));
+  console.log('[Tool Converter] → Backend will use matching tool definitions');
+  console.log('[Tool Converter] → Tools will execute on frontend via LocalRuntime');
   
-  // TODO: Implement proper tool conversion
-  // For now, return null to indicate tools should come from frontend
+  // Return null to signal that backend should use its own tool definitions
+  // that match the frontend tool names
   return null;
+}
+
+/**
+ * Reconstruct a Zod schema from a plain object representation
+ * This handles the most common schema types used in tool definitions
+ */
+function reconstructZodSchema(schemaObj: any): z.ZodType<any> {
+  if (!schemaObj || typeof schemaObj !== 'object') {
+    return z.any();
+  }
+
+  // If it's already a Zod schema, return it
+  if (schemaObj._def) {
+    return schemaObj;
+  }
+
+  // Handle object schemas
+  if (schemaObj.type === 'object' && schemaObj.shape) {
+    const shape: Record<string, z.ZodType<any>> = {};
+    for (const [key, value] of Object.entries(schemaObj.shape)) {
+      shape[key] = reconstructZodSchema(value);
+    }
+    return z.object(shape);
+  }
+
+  // Handle basic types
+  switch (schemaObj.type) {
+    case 'string':
+      return z.string();
+    case 'number':
+      return z.number();
+    case 'boolean':
+      return z.boolean();
+    case 'array':
+      return z.array(reconstructZodSchema(schemaObj.element));
+    default:
+      // Fallback: assume it's an object and try to parse properties
+      if (typeof schemaObj === 'object') {
+        const shape: Record<string, z.ZodType<any>> = {};
+        for (const [key, value] of Object.entries(schemaObj)) {
+          shape[key] = reconstructZodSchema(value);
+        }
+        return z.object(shape);
+      }
+      return z.any();
+  }
 }
 
 /**

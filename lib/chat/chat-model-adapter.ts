@@ -137,29 +137,39 @@ export const chatModelAdapter: ChatModelAdapter = {
               currentReasoning += data.delta;
             }
 
-            // Handle text deltas
-            if (data.type === "text-delta" && data.delta) {
-              currentText += data.delta;
+            // Handle text deltas (AI SDK v6 uses "text-delta")
+            if (data.type === "text-delta" && (data.delta || data.textDelta)) {
+              currentText += data.delta || data.textDelta;
             }
 
-            // Handle tool calls - accumulate in map
+            // AI SDK v6: tool-input-start - initialize tool call
+            if (data.type === "tool-input-start" && data.toolCallId) {
+              toolCallsMap.set(data.toolCallId, {
+                type: "tool-call",
+                toolName: data.toolName,
+                toolCallId: data.toolCallId,
+                args: {},
+              });
+            }
+
+            // AI SDK v6: tool-input-available - final parsed input ready
+            if (data.type === "tool-input-available" && data.toolCallId) {
+              toolCallsMap.set(data.toolCallId, {
+                type: "tool-call",
+                toolName: data.toolName,
+                toolCallId: data.toolCallId,
+                args: data.input || {},
+              });
+            }
+
+            // Legacy: Handle tool calls (for backward compat)
             if (data.type === "tool-call" && data.toolCallId) {
               toolCallsMap.set(data.toolCallId, {
                 type: "tool-call",
                 toolName: data.toolName,
                 toolCallId: data.toolCallId,
-                args: data.args || {},
+                args: data.args || data.input || {},
               });
-            }
-
-            // Handle tool results
-            if (data.type === "tool-result" && data.toolCallId) {
-              if (toolCallsMap.has(data.toolCallId)) {
-                const existingCall = toolCallsMap.get(data.toolCallId)!;
-                toolCallsMap.set(data.toolCallId, {
-                  ...existingCall,
-                });
-              }
             }
 
             // Build content from accumulated state

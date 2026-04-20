@@ -39,7 +39,7 @@ export const APP_CONFIG = {
 
   // AI Model
   ai: {
-    defaultModel: "gpt-4o",
+    defaultModel: "gpt-4o-mini", // Using mini to avoid Responses API issues with tools
     maxSteps: 10,
     maxDuration: 30, // seconds
   },
