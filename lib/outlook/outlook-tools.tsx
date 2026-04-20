@@ -101,56 +101,54 @@ export const outlookTools: Toolkit = {
       oldSubject: z.string().optional().describe("The current subject (optional, will be fetched if not provided)"),
     }),
     execute: async ({ newSubject, oldSubject }) => {
-      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
-        return { 
-          success: false, 
-          oldSubject: oldSubject || '',
-          newSubject,
-          message: "Not running in Outlook environment" 
-        };
-      }
-
-      const item = window.Office.context.mailbox?.item;
-      if (!item) {
-        return { 
-          success: false,
-          oldSubject: oldSubject || '',
-          newSubject,
-          message: "No email item is currently open" 
-        };
-      }
-
-      // Get current subject if not provided
-      let currentSubject = oldSubject || '';
-      if (!currentSubject && typeof item.subject === 'string') {
-        currentSubject = item.subject;
-      } else if (!currentSubject && item.subject && typeof item.subject.getAsync === 'function') {
-        await new Promise((resolve) => {
-          item.subject.getAsync((result: any) => {
-            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-              currentSubject = result.value;
-            }
-            resolve(undefined);
-          });
-        });
-      }
-
+      // Execute runs on server/client boundary, just return the data
+      // The render function (client-side) will handle Office.js interaction
       return {
         success: true,
-        oldSubject: currentSubject,
+        oldSubject: oldSubject || '',
         newSubject,
         message: "Waiting for confirmation",
       };
     },
     render: ({ result }) => {
+      const [currentSubject, setCurrentSubject] = React.useState(result?.oldSubject || '');
+      const [isLoading, setIsLoading] = React.useState(!result?.oldSubject);
+
+      React.useEffect(() => {
+        // Fetch current subject if not provided
+        if (!result?.oldSubject && typeof window !== "undefined" && window.Office?.context?.mailbox?.item) {
+          const item = window.Office.context.mailbox.item;
+          
+          if (typeof item.subject === 'string') {
+            setCurrentSubject(item.subject);
+            setIsLoading(false);
+          } else if (item.subject && typeof item.subject.getAsync === 'function') {
+            item.subject.getAsync((res: any) => {
+              if (res.status === window.Office.AsyncResultStatus.Succeeded) {
+                setCurrentSubject(res.value || '');
+              }
+              setIsLoading(false);
+            });
+          } else {
+            setIsLoading(false);
+          }
+        } else {
+          setIsLoading(false);
+        }
+      }, [result?.oldSubject]);
+
       if (!result) return <div>Préparation de la suggestion...</div>;
       
+      if (isLoading) return <div>Chargement du sujet actuel...</div>;
+
       if (!result.success) {
         return <ToolResultCard title="Modifier le sujet" success={false} message={result.message} />;
       }
 
       const handleConfirm = async () => {
-        if (typeof window === "undefined" || !window.Office) return;
+        if (typeof window === "undefined" || !window.Office) {
+          throw new Error("Office.js not available");
+        }
         const item = window.Office.context.mailbox?.item;
         if (!item || !item.subject || typeof item.subject.setAsync !== 'function') {
           throw new Error("Cannot set subject");
@@ -170,7 +168,7 @@ export const outlookTools: Toolkit = {
       return (
         <ConfirmableChange
           title="Modifier le sujet"
-          oldValue={result.oldSubject}
+          oldValue={currentSubject}
           newValue={result.newSubject}
           onConfirm={handleConfirm}
           type="subject"
@@ -187,57 +185,51 @@ export const outlookTools: Toolkit = {
       bodyType: z.enum(["text", "html"]).optional().describe("The format of the body content. Defaults to text."),
     }),
     execute: async ({ newBody, oldBody, bodyType = "text" }) => {
-      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
-        return { 
-          success: false,
-          oldBody: oldBody || '',
-          newBody,
-          bodyType,
-          message: "Not running in Outlook environment" 
-        };
-      }
-
-      const item = window.Office.context.mailbox?.item;
-      if (!item) {
-        return { 
-          success: false,
-          oldBody: oldBody || '',
-          newBody,
-          bodyType,
-          message: "No email item is currently open" 
-        };
-      }
-
-      // Get current body if not provided
-      let currentBody = oldBody || '';
-      if (!currentBody && item.body && typeof item.body.getAsync === 'function') {
-        await new Promise((resolve) => {
-          item.body.getAsync('text', (result: any) => {
-            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-              currentBody = result.value;
-            }
-            resolve(undefined);
-          });
-        });
-      }
-
+      // Execute runs on server/client boundary, just return the data
+      // The render function (client-side) will handle Office.js interaction
       return {
         success: true,
-        oldBody: currentBody,
+        oldBody: oldBody || '',
         newBody,
         bodyType,
         message: "Waiting for confirmation",
       };
     },
     render: ({ result }) => {
+      const [currentBody, setCurrentBody] = React.useState(result?.oldBody || '');
+      const [isLoading, setIsLoading] = React.useState(!result?.oldBody);
+
+      React.useEffect(() => {
+        // Fetch current body if not provided
+        if (!result?.oldBody && typeof window !== "undefined" && window.Office?.context?.mailbox?.item) {
+          const item = window.Office.context.mailbox.item;
+          if (item.body && typeof item.body.getAsync === 'function') {
+            item.body.getAsync('text', (res: any) => {
+              if (res.status === window.Office.AsyncResultStatus.Succeeded) {
+                setCurrentBody(res.value || '');
+              }
+              setIsLoading(false);
+            });
+          } else {
+            setIsLoading(false);
+          }
+        } else {
+          setIsLoading(false);
+        }
+      }, [result?.oldBody]);
+
       if (!result) return <div>Préparation de la suggestion...</div>;
       
+      if (isLoading) return <div>Chargement du contenu actuel...</div>;
+
       if (!result.success) {
         return <ToolResultCard title="Modifier le corps" success={false} message={result.message} />;
       }
 
       const handleConfirm = async () => {
-        if (typeof window === "undefined" || !window.Office) return;
+        if (typeof window === "undefined" || !window.Office) {
+          throw new Error("Office.js not available");
+        }
         const item = window.Office.context.mailbox?.item;
         if (!item) throw new Error("No email item");
         
@@ -259,7 +251,7 @@ export const outlookTools: Toolkit = {
       return (
         <ConfirmableChange
           title="Modifier le corps de l'email"
-          oldValue={result.oldBody}
+          oldValue={currentBody}
           newValue={result.newBody}
           onConfirm={handleConfirm}
           type="body"
