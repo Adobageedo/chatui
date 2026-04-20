@@ -9,7 +9,7 @@ import {
   useRemoteThreadListRuntime
 } from "@assistant-ui/react";
 import { outlookToolkit } from "@/lib/outlook/outlook-toolkit";
-import { SUGGESTIONS_CONFIG } from "@/config";
+import { SUGGESTIONS_CONFIG_OUTLOOK } from "@/config/suggestions.config";
 import { ReasoningProvider } from "@/contexts/reasoning-context";
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
@@ -24,7 +24,7 @@ export function OutlookRuntimeProvider({
   const { getSystemPrompt } = useOutlookContext();
   
   const aui = useAui({
-    suggestions: Suggestions(SUGGESTIONS_CONFIG),
+    suggestions: Suggestions(SUGGESTIONS_CONFIG_OUTLOOK),
     tools: Tools({ toolkit: outlookToolkit }),
   });
 
