@@ -3,6 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ENV, APP_CONFIG } from '@/config';
 
 export async function middleware(request: NextRequest) {
+  // Handle OPTIONS requests (CORS preflight)
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -38,10 +50,12 @@ export async function middleware(request: NextRequest) {
 
   // Check if request is from Outlook mode (via referer or query param)
   const referer = request.headers.get('referer') || '';
-  const isFromOutlook = referer.includes('/outlook') || pathname.startsWith('/outlook');
+  const searchParams = request.nextUrl.searchParams;
+  const isFromOutlook = referer.includes('/outlook') || pathname.startsWith('/outlook') || searchParams.get('outlook') === 'true';
   
   // Allow API requests from Outlook without authentication
-  const outlookApiRoutes = ['/api/chat', '/api/threads'];
+  // Include all thread-related API routes (threads, messages, title, etc.)
+  const outlookApiRoutes = ['/api/chat', '/api/threads', '/api/upload'];
   const isOutlookApiRequest = isFromOutlook && outlookApiRoutes.some((route) => pathname.startsWith(route));
 
   // Public routes that don't require authentication
