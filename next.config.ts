@@ -24,28 +24,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // CORS headers for API routes (for Outlook add-in)
-        source: "/api/:path*",
-        headers: [
-          {
-            key: "Access-Control-Allow-Credentials",
-            value: "true",
-          },
-          {
-            key: "Access-Control-Allow-Origin",
-            value: "*", // Will be overridden by route-level CORS for better security
-          },
-          {
-            key: "Access-Control-Allow-Methods",
-            value: "GET, DELETE, PATCH, POST, PUT, OPTIONS",
-          },
-          {
-            key: "Access-Control-Allow-Headers",
-            value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization",
-          },
-        ],
-      },
-      {
         // Allow Outlook to embed /outlook routes in an iframe
         source: "/outlook/:path*",
         headers: [

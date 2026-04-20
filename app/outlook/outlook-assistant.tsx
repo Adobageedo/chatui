@@ -1,226 +1,99 @@
 "use client";
 
+import { OutlookRuntimeProvider } from "./OutlookRuntimeProvider";
+import { Thread } from "@/components/assistant-ui/thread";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { Navbar } from "@/layout/navbar";
+import { InteractablesManager } from "@/components/interactables/interactables-manager";
+import { useOutlookContext } from "@/hooks/use-outlook-context";
 import { useEffect, useState } from "react";
-import { Assistant } from "../chat/assistant";
-import { Mail, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
-// Office.js global type declaration
-declare const Office: any;
+function OutlookContextBanner() {
+  const { context, isOutlookMode, getEmailSummary } = useOutlookContext();
+  const [showBanner, setShowBanner] = useState(true);
 
-interface EmailContext {
-  subject?: string;
-  from?: string;
-  to?: string[];
-  body?: string;
-  itemType?: string;
-  cc?: string[];
-  bcc?: string[];
-}
+  if (!isOutlookMode || !context || !context.subject) {
+    return null;
+  }
 
-export function OutlookAssistant() {
-  const [isOutlookMode, setIsOutlookMode] = useState(false);
-  const [emailContext, setEmailContext] = useState<EmailContext | null>(null);
-  const [isLoadingContext, setIsLoadingContext] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isOfficeReady, setIsOfficeReady] = useState(false);
-
-  useEffect(() => {
-    // Check if Office.js is available and ready
-    if (typeof window !== 'undefined') {
-      if (typeof Office !== 'undefined' && Office.context) {
-        // Office.js already loaded
-        setIsOfficeReady(true);
-      } else if (typeof Office !== 'undefined') {
-        // Office.js exists but not ready
-        Office.onReady(() => {
-          setIsOfficeReady(true);
-        });
-      } else {
-        // Not in Office context (regular browser)
-        setIsOfficeReady(true);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    console.log('[OutlookAssistant] starting auth check...');
-    const supabase = createClient();
-
-    const checkAuth = async () => {
-      // First, check if we have tokens in URL hash (passed from sign-in page)
-      const hash = window.location.hash;
-      if (hash && hash.includes('access_token')) {
-        console.log('[OutlookAssistant] Found tokens in URL hash, setting session...');
-        try {
-          const params = new URLSearchParams(hash.substring(1));
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token) {
-            const { data, error } = await supabase.auth.setSession({
-              access_token,
-              refresh_token: refresh_token || '',
-            });
-
-            if (error) {
-              console.error('[OutlookAssistant] Failed to set session:', error);
-              setIsAuthenticated(false);
-            } else if (data.session) {
-              console.log('[OutlookAssistant] Session established from tokens');
-              setIsAuthenticated(true);
-            } else {
-              setIsAuthenticated(false);
-            }
-            return;
-          }
-        } catch (err) {
-          console.error('[OutlookAssistant] Error parsing tokens:', err);
-        }
-      }
-
-      // Otherwise check for existing session (with retries for embedded browser)
-      let attempts = 0;
-      const maxAttempts = 10;
-
-      const tryGetSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log(`[OutlookAssistant] auth check attempt ${attempts + 1}, session:`, !!session);
-
-        if (session) {
-          setIsAuthenticated(true);
-        } else if (attempts < maxAttempts) {
-          attempts++;
-          setTimeout(tryGetSession, 300);
-        } else {
-          setIsAuthenticated(false);
-        }
-      };
-
-      await tryGetSession();
-    };
-
-    checkAuth();
-    // No onAuthStateChange listener - avoiding race conditions with singleton client
-  }, []);
-
-  useEffect(() => {
-    // Redirect to signin if not authenticated
-    if (isAuthenticated === false) {
-      window.location.href = "/outlook/signin";
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const outlookMode = urlParams.get('outlook') === 'true';
-    setIsOutlookMode(outlookMode);
-
-    if (outlookMode) {
-      // Read email context stored by taskpane.html before redirecting here
-      try {
-        const stored = sessionStorage.getItem('outlook_email_context');
-        if (stored) {
-          const ctx = JSON.parse(stored);
-          console.log('[OutlookAssistant] loaded email context from sessionStorage:', ctx);
-          setEmailContext(ctx);
-          sessionStorage.removeItem('outlook_email_context');
-        }
-      } catch (e) {
-        console.warn('[OutlookAssistant] failed to read sessionStorage context:', e);
-      }
-      setIsLoadingContext(false);
-    } else {
-      setIsLoadingContext(false);
-    }
-  }, [isAuthenticated]);
-
-  console.log('[OutlookAssistant] render', { isAuthenticated, isOutlookMode, isLoadingContext, isOfficeReady });
-
-  // Wait for Office.js to be ready
-  if (!isOfficeReady) {
+  if (!showBanner) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <p className="text-sm text-gray-600">Loading Office.js...</p>
+      <div className="bg-blue-50 border-b border-blue-100 px-4 py-1">
+        <button
+          onClick={() => setShowBanner(true)}
+          className="text-xs text-blue-600 hover:text-blue-800"
+        >
+          Show email context
+        </button>
       </div>
     );
   }
 
-  if (isAuthenticated === null) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <p className="text-sm text-gray-600">Checking authentication...</p>
-      </div>
-    );
-  }
-
-  // While we know auth status but haven't determined outlook mode yet, keep loading
-  if (isAuthenticated && isLoadingContext && !isOutlookMode) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (isOutlookMode) {
-    return (
-      <div className="h-screen flex flex-col bg-background">
-        {/* Outlook Header */}
-        <div className="border-b bg-background/95 backdrop-blur px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Email Assistant</span>
-            </div>
-            {emailContext?.subject && (
-              <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={emailContext.subject}>
-                {emailContext.subject}
+  return (
+    <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+              Outlook Context
+            </span>
+            <button
+              onClick={() => setShowBanner(false)}
+              className="text-blue-400 hover:text-blue-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="text-sm text-gray-700 space-y-1">
+            {context.subject && (
+              <div>
+                <span className="font-medium">Subject:</span> {context.subject}
+              </div>
+            )}
+            {context.from && (
+              <div>
+                <span className="font-medium">From:</span> {context.from}
+              </div>
+            )}
+            {context.to && context.to.length > 0 && (
+              <div>
+                <span className="font-medium">To:</span> {context.to.join(", ")}
               </div>
             )}
           </div>
-        </div>
-
-        {/* Chat Interface */}
-        <div className="flex-1 relative overflow-hidden">
-          {isLoadingContext && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Loading email context...</span>
-              </div>
-            </div>
-          )}
-          <Assistant />
-        </div>
-      </div>
-    );
-  }
-
-  // Regular web mode - show info page
-  return (
-    <div className="min-h-screen">
-      <div className="border-b bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-2">
-            <Mail className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">Email Assistant</span>
-          </div>
-        </div>
-      </div>
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Outlook Add-in</h2>
-          <p className="text-muted-foreground">
-            This page is designed to work within the Outlook add-in. 
-            Please access it through Outlook to use the email assistant features.
-          </p>
         </div>
       </div>
     </div>
   );
 }
+
+export const OutlookAssistant = () => {
+  return (
+    <OutlookRuntimeProvider>
+      <SidebarProvider>
+        <div className="flex h-dvh w-full pr-0.5">
+          <ThreadListSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger />
+              <Navbar hideLogo={true} />
+            </header>
+            <OutlookContextBanner />
+            <div className="flex-1 overflow-hidden">
+              <Thread />
+            </div>
+          </SidebarInset>
+        </div>
+        
+        <InteractablesManager />
+      </SidebarProvider>
+    </OutlookRuntimeProvider>
+  );
+};

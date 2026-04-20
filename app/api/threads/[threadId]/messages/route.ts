@@ -2,37 +2,27 @@ import { messageService } from "@/service/api/threads/message.service";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
 import { NextResponse } from "next/server";
 import { ApiError } from "@/service/api/shared/api-error";
-import { handleCors, corsHeaders } from "@/lib/api/cors";
-
-/**
- * OPTIONS /api/threads/[threadId]/messages
- * Handle CORS preflight
- */
-export async function OPTIONS(request: Request) {
-  return handleCors(request) || new Response(null, { status: 200 });
-}
 
 /**
  * GET /api/threads/[threadId]/messages
  * Thin controller - delegates to MessageService
+ * Supports optional auth for Outlook mode
  */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
-    const auth = await AuthMiddleware.verifyAuth();
+    const auth = await AuthMiddleware.getAuthOrNull();
     const { threadId } = await params;
 
+    // Return empty list if not authenticated (Outlook mode)
+    if (!auth) {
+      return NextResponse.json({ messages: [] });
+    }
+
     const result = await messageService.listMessages(threadId, auth.userId);
-    const response = NextResponse.json(result);
-    
-    const origin = req.headers.get("origin");
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
-      response.headers.set(key, value);
-    });
-    
-    return response;
+    return NextResponse.json(result);
   } catch (error) {
     console.error("List messages error:", error);
 
@@ -47,25 +37,28 @@ export async function GET(
 /**
  * POST /api/threads/[threadId]/messages
  * Thin controller - delegates to MessageService
+ * Supports optional auth for Outlook mode (doesn't save messages)
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
-    const auth = await AuthMiddleware.verifyAuth();
+    const auth = await AuthMiddleware.getAuthOrNull();
     const { threadId } = await params;
     const body = await req.json();
 
+    // If not authenticated (Outlook mode), return temp message without saving
+    if (!auth) {
+      return NextResponse.json({
+        id: `temp-msg-${Date.now()}`,
+        ...body,
+        created_at: new Date().toISOString(),
+      });
+    }
+
     const result = await messageService.createMessage(threadId, auth.userId, body);
-    const response = NextResponse.json(result);
-    
-    const origin = req.headers.get("origin");
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
-      response.headers.set(key, value);
-    });
-    
-    return response;
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Create message error:", error);
 

@@ -2,38 +2,28 @@ import { suggestionService } from "@/service/api/threads/suggestion.service";
 import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
 import { NextResponse } from "next/server";
 import { ApiError } from "@/service/api/shared/api-error";
-import { handleCors, corsHeaders } from "@/lib/api/cors";
-
-/**
- * OPTIONS /api/threads/[threadId]/title
- * Handle CORS preflight
- */
-export async function OPTIONS(request: Request) {
-  return handleCors(request) || new Response(null, { status: 200 });
-}
 
 /**
  * POST /api/threads/[threadId]/title
  * Thin controller - delegates to SuggestionService
+ * Supports optional auth for Outlook mode
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
-    const auth = await AuthMiddleware.verifyAuth();
+    const auth = await AuthMiddleware.getAuthOrNull();
     const { threadId } = await params;
     const body = await req.json();
 
+    // If not authenticated (Outlook mode), return generic title without saving
+    if (!auth) {
+      return NextResponse.json({ title: "Outlook Chat" });
+    }
+
     const result = await suggestionService.generateTitle(threadId, auth.userId, body);
-    const response = NextResponse.json(result);
-    
-    const origin = req.headers.get("origin");
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
-      response.headers.set(key, value);
-    });
-    
-    return response;
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Generate title error:", error);
 

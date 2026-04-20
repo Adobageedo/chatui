@@ -1,15 +1,6 @@
 import { suggestionService } from "@/service/api/threads/suggestion.service";
 import { NextResponse } from "next/server";
 import { ApiError } from "@/service/api/shared/api-error";
-import { handleCors, corsHeaders } from "@/lib/api/cors";
-
-/**
- * OPTIONS /api/threads/[threadId]/suggestions
- * Handle CORS preflight
- */
-export async function OPTIONS(request: Request) {
-  return handleCors(request) || new Response(null, { status: 200 });
-}
 
 /**
  * POST /api/threads/[threadId]/suggestions
@@ -23,14 +14,7 @@ export async function POST(
     const body = await req.json();
 
     const result = await suggestionService.generateSuggestions(body);
-    const response = NextResponse.json(result);
-    
-    const origin = req.headers.get("origin");
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => {
-      response.headers.set(key, value);
-    });
-    
-    return response;
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Generate suggestions error:", error);
 

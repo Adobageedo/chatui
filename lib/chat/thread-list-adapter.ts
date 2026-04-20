@@ -37,6 +37,12 @@ export const threadListAdapter: RemoteThreadListAdapter = {
       const now = Date.now();
       if (threadListCache.data && (now - threadListCache.timestamp) < CACHE_TTL) {
         const { threads } = threadListCache.data;
+        
+        // Guard against missing threads
+        if (!threads || !Array.isArray(threads)) {
+          return { threads: [] };
+        }
+        
         return {
           threads: threads.map((thread) => ({
             remoteId: thread.id,
@@ -52,6 +58,12 @@ export const threadListAdapter: RemoteThreadListAdapter = {
       threadListCache = { data: result, timestamp: now };
       
       const { threads } = result;
+      
+      // Guard against missing threads (e.g., unauthenticated users)
+      if (!threads || !Array.isArray(threads)) {
+        return { threads: [] };
+      }
+      
       return {
         threads: threads.map((thread) => ({
           remoteId: thread.id,
@@ -146,7 +158,7 @@ export const threadListAdapter: RemoteThreadListAdapter = {
    */
   async fetch(remoteId) {
     // Check if we have cached data for this thread
-    if (threadListCache.data) {
+    if (threadListCache.data && threadListCache.data.threads && Array.isArray(threadListCache.data.threads)) {
       const cachedThread = threadListCache.data.threads.find(t => t.id === remoteId);
       if (cachedThread) {
         // Return cached data immediately

@@ -1,5 +1,5 @@
-import { OutlookStandalone } from "./outlook-standalone";
+import { OutlookAssistant } from "./outlook-assistant";
 
 export default function OutlookPage() {
-  return <OutlookStandalone />;
+  return <OutlookAssistant />;
 }

@@ -3,11 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ENV, APP_CONFIG } from '@/config';
 
 export async function middleware(request: NextRequest) {
-  // Skip auth for OPTIONS preflight requests
-  if (request.method === "OPTIONS") {
-    return NextResponse.next();
-  }
-
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -41,12 +36,20 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Check if request is from Outlook mode (via referer or query param)
+  const referer = request.headers.get('referer') || '';
+  const isFromOutlook = referer.includes('/outlook') || pathname.startsWith('/outlook');
+  
+  // Allow API requests from Outlook without authentication
+  const outlookApiRoutes = ['/api/chat', '/api/threads'];
+  const isOutlookApiRequest = isFromOutlook && outlookApiRoutes.some((route) => pathname.startsWith(route));
+
   // Public routes that don't require authentication
   const publicRoutes = APP_CONFIG.auth.publicRoutes;
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || isOutlookApiRequest;
 
-  // Redirect authenticated users away from auth pages
-  if (user && isPublicRoute && pathname !== "/auth/callback") {
+  // Redirect authenticated users away from auth pages (but not from Outlook)
+  if (user && isPublicRoute && pathname !== "/auth/callback" && !pathname.startsWith("/outlook")) {
     const onboardingCompleted = user?.user_metadata?.onboarding_completed;
 
     if (!onboardingCompleted) {
