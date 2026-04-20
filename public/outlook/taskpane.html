@@ -84,9 +84,9 @@
             const context = { itemType: item.itemType, subject: '', from: '', to: [], cc: [], bcc: [], body: '' };
 
             if (item.from) context.from = item.from.emailAddress || item.from.displayName || '';
-            if (item.to)  context.to  = item.to.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
-            if (item.cc)  context.cc  = item.cc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
-            if (item.bcc) context.bcc = item.bcc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
+            if (item.to && Array.isArray(item.to))  context.to  = item.to.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
+            if (item.cc && Array.isArray(item.cc))  context.cc  = item.cc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
+            if (item.bcc && Array.isArray(item.bcc)) context.bcc = item.bcc.map(r => r.emailAddress || r.displayName || '').filter(Boolean);
 
             // Subject
             function getBody(ctx) {

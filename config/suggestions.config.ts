@@ -30,12 +30,12 @@ export const SUGGESTIONS_CONFIG_OUTLOOK = [
   {
     title: "Répondre à l'email",
     label: "Rédiger une réponse",
-    prompt: "Rédige une réponse professionnelle et courtoise à cet email. Utilise l'outil suggestBodyChange pour proposer le nouveau texte.",
+    prompt: "Rédige une réponse professionnelle et courtoise à cet email. Utilise les tools pour l'insérer dans l'email.",
   },
   {
     title: "Corriger l'email",
     label: "Corriger orthographe et grammaire",
-    prompt: "Corrige l'orthographe, la grammaire et améliore le style de cet email. Utilise l'outil suggestBodyChange pour proposer la version corrigée.",
+    prompt: "Corrige l'orthographe, la grammaire et améliore le style de cet email. Utilise les tools pour remplacer le contenu.",
   },
   {
     title: "Résumer l'email",
@@ -43,13 +43,8 @@ export const SUGGESTIONS_CONFIG_OUTLOOK = [
     prompt: "Résume les points clés de cet email en 3-4 points principaux.",
   },
   {
-    title: "Améliorer le ton",
-    label: "Rendre plus formel",
-    prompt: "Réécris cet email avec un ton plus formel et professionnel. Utilise l'outil suggestBodyChange pour proposer la nouvelle version.",
-  },
-  {
-    title: "Améliorer le sujet",
-    label: "Sujet plus accrocheur",
-    prompt: "Propose un sujet plus professionnel et accrocheur pour cet email. Utilise l'outil suggestSubjectChange.",
+    title: "Email de suivi",
+    label: "Relance professionnelle",
+    prompt: "Rédige un email de relance professionnel et poli basé sur le contexte de cet email.",
   },
 ];
