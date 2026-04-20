@@ -3,29 +3,32 @@
 import type { ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
-  useRemoteThreadListRuntime,
   useAui,
-  useLocalRuntime,
   Suggestions,
   Tools,
+  Interactables,
+  useRemoteThreadListRuntime
 } from "@assistant-ui/react";
 import { appToolkit } from "@/lib/toolkit";
-import { threadListAdapter } from "@/lib/chat/thread-list-adapter";
-import { chatModelAdapter } from "@/lib/chat/chat-model-adapter";
-import { attachmentAdapter } from "@/lib/chat/attachment-adapter";
-import { speechAdapter, isSpeechSynthesisSupported } from "@/lib/chat/speech-adapter";
 import { SUGGESTIONS_CONFIG } from "@/config";
 import { ReasoningProvider } from "@/contexts/reasoning-context";
+import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
+import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
+import { AssistantChatTransport } from "@assistant-ui/react-ai-sdk";
+import { useThreadHistoryAdapterV6 } from "@/lib/chat/thread-history-adapter-v6";
+import { threadListAdapter } from "@/lib/chat/thread-list-adapter";
 
 /**
- * Main Runtime Provider
- * Provides LocalRuntime with all adapters:
- * - Chat model adapter (streaming + tool calls)
- * - Attachment adapter (file uploads)
- * - Speech synthesis adapter (text-to-speech)
- * - History adapter (message persistence via ThreadProvider)
- * - Suggestion adapter (follow-up suggestions via ThreadProvider)
- * - Thread list adapter (multi-thread management in Supabase)
+ * Main Runtime Provider (AI SDK v6)
+ * Uses useChatRuntime hook integrated with Vercel AI SDK v6
+ * Features:
+ * - Streaming chat with automatic tool execution
+ * - Frontend tools via appToolkit
+ * - Suggestions and reasoning support
+ * - Token usage tracking via messageMetadata
+ * - Message history persistence (withFormat pattern for UIMessage)
+ * - Thread list management for sidebar
+ * - Interactables for email and document editing
  */
 export function MyRuntimeProvider({
   children,
@@ -33,18 +36,21 @@ export function MyRuntimeProvider({
   const aui = useAui({
     suggestions: Suggestions(SUGGESTIONS_CONFIG),
     tools: Tools({ toolkit: appToolkit }),
+    // interactables: Interactables(),
   });
 
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: () => {
-      return useLocalRuntime(chatModelAdapter, {
-        maxSteps: 5,
+      // Call history adapter inside runtimeHook where AUI context is available
+      const historyAdapter = useThreadHistoryAdapterV6();
+      
+      return useChatRuntime({ 
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+        transport: new AssistantChatTransport({
+          api: "/api/chat",
+        }),
         adapters: {
-          attachments: attachmentAdapter,
-          // Only add speech adapter if browser supports it
-          ...(typeof window !== "undefined" && isSpeechSynthesisSupported()
-            ? { speech: speechAdapter }
-            : {}),
+          history: historyAdapter,
         },
       });
     },

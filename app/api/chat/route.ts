@@ -1,44 +1,54 @@
-import { chatService } from "@/service/api/chat/chat.service";
-import { ApiResponseBuilder } from "@/service/api/shared/api-response";
-import { ApiError } from "@/service/api/shared/api-error";
-import { AuthMiddleware } from "@/service/api/shared/auth.middleware";
-import { handleCors } from "@/lib/api/cors";
+import { openai } from "@ai-sdk/openai";
+import { frontendTools } from "@assistant-ui/react-ai-sdk";
+import {
+  JSONSchema7,
+  streamText,
+  convertToModelMessages,
+  type UIMessage,
+} from "ai";
 
 export const maxDuration = 30;
 
-/**
- * OPTIONS /api/chat
- * Handle CORS preflight
- */
-export async function OPTIONS(request: Request) {
-  return handleCors(request) || new Response(null, { status: 200 });
-}
-
-/**
- * Chat endpoint for LocalRuntime
- * Thin controller - delegates to ChatService
- */
 export async function POST(req: Request) {
-  try {
-    // Verify authentication
-    await AuthMiddleware.verifyAuth();
-    
-    const { messages, reasoningEnabled = false, emailContext = null, tools = null } = await req.json();
+  const {
+    messages,
+    system,
+    tools,
+  }: {
+    messages: UIMessage[];
+    system?: string;
+    tools?: Record<string, { description?: string; parameters: JSONSchema7 }>;
+  } = await req.json();
 
-    // Delegate to service layer
-    return await chatService.streamChat(
-      { messages, emailContext }, 
-      { reasoningEnabled, emailContext, frontendTools: tools }
-    );
-  } catch (error) {
-    console.error("Chat API error:", error);
+  const result = streamText({
+    model: openai.responses("gpt-4o-mini"),
+    messages: await convertToModelMessages(messages),
+    system,
+    tools: {
+      ...frontendTools(tools ?? {}),
+    },
+    providerOptions: {
+      openai: {
+        reasoningEffort: "low",
+        reasoningSummary: "auto",
+      },
+    },
+  });
 
-    // Handle custom API errors
-    if (error instanceof ApiError) {
-      return ApiResponseBuilder.error(error.message, error.statusCode, error.details);
-    }
-
-    // Handle unexpected errors
-    return ApiResponseBuilder.serverError(error);
-  }
+  return result.toUIMessageStreamResponse({
+    sendReasoning: true,
+    messageMetadata: ({ part }) => {
+      if (part.type === "finish") {
+        return {
+          usage: part.totalUsage,
+        };
+      }
+      if (part.type === "finish-step") {
+        return {
+          modelId: part.response.modelId,
+        };
+      }
+      return undefined;
+    },
+  });
 }

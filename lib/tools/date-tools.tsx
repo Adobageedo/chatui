@@ -68,7 +68,7 @@ export const dateTools: Toolkit = {
         <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-            <h3 className="font-semibold">Current Date & Time</h3>
+            <h3 className="font-semibold">Current Date & Time New</h3>
           </div>
           <div className="space-y-2">
             <div className="text-2xl font-mono">{result.formatted}</div>
