@@ -304,102 +304,170 @@ export const outlookTools: Toolkit = {
     },
   },
 
+  // Alias for backward compatibility - redirects to suggestSubjectChange
   setEmailSubject: {
-    description: "Set or update the subject line of the current email in Outlook",
+    description: "DEPRECATED: Use suggestSubjectChange instead. Set or update the subject line of the current email in Outlook with confirmation UI",
     parameters: z.object({
       subject: z.string().describe("The subject line to set"),
     }),
     execute: async ({ subject }) => {
-      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
-        return { 
-          success: false, 
-          message: "Not running in Outlook environment" 
-        };
-      }
-
-      const item = window.Office.context.mailbox?.item;
-      if (!item) {
-        return { 
-          success: false, 
-          message: "No email item is currently open" 
-        };
-      }
-
-      if (!item.subject || typeof item.subject.setAsync !== "function") {
-        return { 
-          success: false, 
-          message: "Cannot set subject on this email (read-only or not supported)" 
-        };
-      }
-
-      return new Promise((resolve) => {
-        item.subject.setAsync(
-          subject,
-          (result: any) => {
-            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-              resolve({ success: true, message: "Subject set successfully" });
-            } else {
-              resolve({ 
-                success: false, 
-                message: `Failed to set subject: ${result.error?.message || "Unknown error"}` 
-              });
-            }
-          }
-        );
-      });
+      console.log('[DEBUG] setEmailSubject called, redirecting to suggestSubjectChange');
+      return {
+        success: true,
+        oldSubject: '',
+        newSubject: subject,
+        message: "Waiting for confirmation",
+      };
     },
     render: ({ result }) => {
-      if (!result) return <div>Setting subject...</div>;
-      return <ToolResultCard title="Set Email Subject" success={result.success} message={result.message} />;
+      const [currentSubject, setCurrentSubject] = React.useState('');
+      const [isLoading, setIsLoading] = React.useState(true);
+
+      React.useEffect(() => {
+        console.log('[DEBUG] setEmailSubject render - checking Office.js');
+        if (typeof window !== "undefined" && window.Office?.context?.mailbox?.item) {
+          const item = window.Office.context.mailbox.item;
+          console.log('[DEBUG] Office.js available, item:', !!item);
+          
+          if (typeof item.subject === 'string') {
+            setCurrentSubject(item.subject);
+            setIsLoading(false);
+          } else if (item.subject && typeof item.subject.getAsync === 'function') {
+            item.subject.getAsync((res: any) => {
+              if (res.status === window.Office.AsyncResultStatus.Succeeded) {
+                setCurrentSubject(res.value || '');
+              }
+              setIsLoading(false);
+            });
+          } else {
+            setIsLoading(false);
+          }
+        } else {
+          console.error('[DEBUG] Office.js NOT available in render');
+          setIsLoading(false);
+        }
+      }, []);
+
+      if (!result) return <div>Préparation...</div>;
+      if (isLoading) return <div>Chargement du sujet actuel...</div>;
+
+      const handleConfirm = async () => {
+        console.log('[DEBUG] Confirming subject change');
+        if (typeof window === "undefined" || !window.Office) {
+          throw new Error("Office.js not available");
+        }
+        const item = window.Office.context.mailbox?.item;
+        if (!item || !item.subject || typeof item.subject.setAsync !== 'function') {
+          throw new Error("Cannot set subject");
+        }
+        
+        return new Promise<void>((resolve, reject) => {
+          item.subject.setAsync(result.newSubject, (apiResult: any) => {
+            if (apiResult.status === window.Office.AsyncResultStatus.Succeeded) {
+              console.log('[DEBUG] Subject changed successfully');
+              resolve();
+            } else {
+              console.error('[DEBUG] Failed to change subject:', apiResult.error);
+              reject(new Error(apiResult.error?.message || 'Failed'));
+            }
+          });
+        });
+      };
+
+      return (
+        <ConfirmableChange
+          title="Modifier le sujet"
+          oldValue={currentSubject}
+          newValue={result.newSubject}
+          onConfirm={handleConfirm}
+          type="subject"
+        />
+      );
     },
   },
 
+  // Alias for backward compatibility - redirects to suggestBodyChange
   replaceEmailBody: {
-    description: "Replace the entire body of the current email in Outlook",
+    description: "DEPRECATED: Use suggestBodyChange instead. Replace the entire body of the current email in Outlook with confirmation UI",
     parameters: z.object({
       body: z.string().describe("The new body content for the email"),
       bodyType: z.enum(["text", "html"]).optional().describe("The format of the body content (text or html). Defaults to text."),
     }),
     execute: async ({ body, bodyType = "text" }) => {
-      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
-        return { 
-          success: false, 
-          message: "Not running in Outlook environment" 
-        };
-      }
-
-      const item = window.Office.context.mailbox?.item;
-      if (!item) {
-        return { 
-          success: false, 
-          message: "No email item is currently open" 
-        };
-      }
-
-      const coercionType = bodyType === "html" 
-        ? window.Office.CoercionType.Html 
-        : window.Office.CoercionType.Text;
-
-      return new Promise((resolve) => {
-        item.body.setAsync(
-          body,
-          { coercionType },
-          (result: any) => {
-            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-              resolve({ success: true, message: "Email body replaced successfully" });
-            } else {
-              resolve({ 
-                success: false, 
-                message: `Failed to replace body: ${result.error?.message || "Unknown error"}` 
-              });
-            }
-          }
-        );
-      });
+      console.log('[DEBUG] replaceEmailBody called, redirecting to suggestBodyChange');
+      return {
+        success: true,
+        oldBody: '',
+        newBody: body,
+        bodyType,
+        message: "Waiting for confirmation",
+      };
     },
     render: ({ result }) => {
-      if (!result) return <div>Replacing email body...</div>;
-      return <ToolResultCard title="Replace Email Body" success={result.success} message={result.message} />;
+      const [currentBody, setCurrentBody] = React.useState('');
+      const [isLoading, setIsLoading] = React.useState(true);
+
+      React.useEffect(() => {
+        console.log('[DEBUG] replaceEmailBody render - checking Office.js');
+        if (typeof window !== "undefined" && window.Office?.context?.mailbox?.item) {
+          const item = window.Office.context.mailbox.item;
+          console.log('[DEBUG] Office.js available, item:', !!item);
+          
+          if (item.body && typeof item.body.getAsync === 'function') {
+            item.body.getAsync('text', (res: any) => {
+              if (res.status === window.Office.AsyncResultStatus.Succeeded) {
+                console.log('[DEBUG] Body retrieved, length:', res.value?.length);
+                setCurrentBody(res.value || '');
+              }
+              setIsLoading(false);
+            });
+          } else {
+            console.warn('[DEBUG] body.getAsync not available');
+            setIsLoading(false);
+          }
+        } else {
+          console.error('[DEBUG] Office.js NOT available in render');
+          setIsLoading(false);
+        }
+      }, []);
+
+      if (!result) return <div>Préparation...</div>;
+      if (isLoading) return <div>Chargement du contenu actuel...</div>;
+
+      const handleConfirm = async () => {
+        console.log('[DEBUG] Confirming body change');
+        if (typeof window === "undefined" || !window.Office) {
+          throw new Error("Office.js not available");
+        }
+        const item = window.Office.context.mailbox?.item;
+        if (!item) throw new Error("No email item");
+        
+        const coercionType = result.bodyType === "html" 
+          ? window.Office.CoercionType.Html 
+          : window.Office.CoercionType.Text;
+
+        return new Promise<void>((resolve, reject) => {
+          item.body.setAsync(result.newBody, { coercionType }, (apiResult: any) => {
+            if (apiResult.status === window.Office.AsyncResultStatus.Succeeded) {
+              console.log('[DEBUG] Body changed successfully');
+              resolve();
+            } else {
+              console.error('[DEBUG] Failed to change body:', apiResult.error);
+              reject(new Error(apiResult.error?.message || 'Failed'));
+            }
+          });
+        });
+      };
+
+      return (
+        <ConfirmableChange
+          title="Modifier le corps de l'email"
+          oldValue={currentBody}
+          newValue={result.newBody}
+          onConfirm={handleConfirm}
+          type="body"
+        />
+      );
     },
   },
 
