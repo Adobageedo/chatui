@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { z } from "zod";
 import type { Toolkit } from "@assistant-ui/react";
 
@@ -21,7 +22,252 @@ function ToolResultCard({ title, success, message }: { title: string; success: b
   );
 }
 
+function ConfirmableChange({ 
+  title, 
+  oldValue, 
+  newValue, 
+  onConfirm, 
+  type 
+}: { 
+  title: string; 
+  oldValue: string; 
+  newValue: string; 
+  onConfirm: () => Promise<void>;
+  type: 'subject' | 'body';
+}) {
+  const [isApplying, setIsApplying] = React.useState(false);
+  const [applied, setApplied] = React.useState(false);
+
+  const handleConfirm = async () => {
+    setIsApplying(true);
+    try {
+      await onConfirm();
+      setApplied(true);
+    } catch (error) {
+      console.error('Failed to apply change:', error);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+        <h3 className="font-semibold">{title}</h3>
+      </div>
+      
+      <div className="space-y-3">
+        {/* Ancien texte barré */}
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Actuel :</span>
+          <div className={`p-2 rounded bg-red-50 border border-red-200 ${type === 'body' ? 'max-h-32 overflow-auto' : ''}`}>
+            <p className="line-through text-red-700 text-sm">{oldValue || '(vide)'}</p>
+          </div>
+        </div>
+
+        {/* Nouveau texte */}
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Proposé :</span>
+          <div className={`p-2 rounded bg-green-50 border border-green-200 ${type === 'body' ? 'max-h-32 overflow-auto' : ''}`}>
+            <p className="text-green-700 text-sm whitespace-pre-wrap">{newValue}</p>
+          </div>
+        </div>
+
+        {/* Bouton de confirmation */}
+        {!applied ? (
+          <button
+            onClick={handleConfirm}
+            disabled={isApplying}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          >
+            {isApplying ? 'Application...' : 'Remplacer'}
+          </button>
+        ) : (
+          <div className="w-full px-4 py-2 bg-green-600 text-white rounded-md text-center text-sm font-medium">
+            ✓ Appliqué avec succès
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const outlookTools: Toolkit = {
+  suggestSubjectChange: {
+    description: "Suggest a new subject for the email with a confirmation UI showing old (strikethrough) and new subject",
+    parameters: z.object({
+      newSubject: z.string().describe("The new subject to propose"),
+      oldSubject: z.string().optional().describe("The current subject (optional, will be fetched if not provided)"),
+    }),
+    execute: async ({ newSubject, oldSubject }) => {
+      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
+        return { 
+          success: false, 
+          oldSubject: oldSubject || '',
+          newSubject,
+          message: "Not running in Outlook environment" 
+        };
+      }
+
+      const item = window.Office.context.mailbox?.item;
+      if (!item) {
+        return { 
+          success: false,
+          oldSubject: oldSubject || '',
+          newSubject,
+          message: "No email item is currently open" 
+        };
+      }
+
+      // Get current subject if not provided
+      let currentSubject = oldSubject || '';
+      if (!currentSubject && typeof item.subject === 'string') {
+        currentSubject = item.subject;
+      } else if (!currentSubject && item.subject && typeof item.subject.getAsync === 'function') {
+        await new Promise((resolve) => {
+          item.subject.getAsync((result: any) => {
+            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
+              currentSubject = result.value;
+            }
+            resolve(undefined);
+          });
+        });
+      }
+
+      return {
+        success: true,
+        oldSubject: currentSubject,
+        newSubject,
+        message: "Waiting for confirmation",
+      };
+    },
+    render: ({ result }) => {
+      if (!result) return <div>Préparation de la suggestion...</div>;
+      
+      if (!result.success) {
+        return <ToolResultCard title="Modifier le sujet" success={false} message={result.message} />;
+      }
+
+      const handleConfirm = async () => {
+        if (typeof window === "undefined" || !window.Office) return;
+        const item = window.Office.context.mailbox?.item;
+        if (!item || !item.subject || typeof item.subject.setAsync !== 'function') {
+          throw new Error("Cannot set subject");
+        }
+        
+        return new Promise<void>((resolve, reject) => {
+          item.subject.setAsync(result.newSubject, (apiResult: any) => {
+            if (apiResult.status === window.Office.AsyncResultStatus.Succeeded) {
+              resolve();
+            } else {
+              reject(new Error(apiResult.error?.message || 'Failed'));
+            }
+          });
+        });
+      };
+
+      return (
+        <ConfirmableChange
+          title="Modifier le sujet"
+          oldValue={result.oldSubject}
+          newValue={result.newSubject}
+          onConfirm={handleConfirm}
+          type="subject"
+        />
+      );
+    },
+  },
+
+  suggestBodyChange: {
+    description: "Suggest a new body for the email with a confirmation UI showing old (strikethrough) and new body",
+    parameters: z.object({
+      newBody: z.string().describe("The new body content to propose"),
+      oldBody: z.string().optional().describe("The current body (optional, will be fetched if not provided)"),
+      bodyType: z.enum(["text", "html"]).optional().describe("The format of the body content. Defaults to text."),
+    }),
+    execute: async ({ newBody, oldBody, bodyType = "text" }) => {
+      if (typeof window === "undefined" || !window.Office || !window.Office.context) {
+        return { 
+          success: false,
+          oldBody: oldBody || '',
+          newBody,
+          bodyType,
+          message: "Not running in Outlook environment" 
+        };
+      }
+
+      const item = window.Office.context.mailbox?.item;
+      if (!item) {
+        return { 
+          success: false,
+          oldBody: oldBody || '',
+          newBody,
+          bodyType,
+          message: "No email item is currently open" 
+        };
+      }
+
+      // Get current body if not provided
+      let currentBody = oldBody || '';
+      if (!currentBody && item.body && typeof item.body.getAsync === 'function') {
+        await new Promise((resolve) => {
+          item.body.getAsync('text', (result: any) => {
+            if (result.status === window.Office.AsyncResultStatus.Succeeded) {
+              currentBody = result.value;
+            }
+            resolve(undefined);
+          });
+        });
+      }
+
+      return {
+        success: true,
+        oldBody: currentBody,
+        newBody,
+        bodyType,
+        message: "Waiting for confirmation",
+      };
+    },
+    render: ({ result }) => {
+      if (!result) return <div>Préparation de la suggestion...</div>;
+      
+      if (!result.success) {
+        return <ToolResultCard title="Modifier le corps" success={false} message={result.message} />;
+      }
+
+      const handleConfirm = async () => {
+        if (typeof window === "undefined" || !window.Office) return;
+        const item = window.Office.context.mailbox?.item;
+        if (!item) throw new Error("No email item");
+        
+        const coercionType = result.bodyType === "html" 
+          ? window.Office.CoercionType.Html 
+          : window.Office.CoercionType.Text;
+
+        return new Promise<void>((resolve, reject) => {
+          item.body.setAsync(result.newBody, { coercionType }, (apiResult: any) => {
+            if (apiResult.status === window.Office.AsyncResultStatus.Succeeded) {
+              resolve();
+            } else {
+              reject(new Error(apiResult.error?.message || 'Failed'));
+            }
+          });
+        });
+      };
+
+      return (
+        <ConfirmableChange
+          title="Modifier le corps de l'email"
+          oldValue={result.oldBody}
+          newValue={result.newBody}
+          onConfirm={handleConfirm}
+          type="body"
+        />
+      );
+    },
+  },
+
   insertEmailText: {
     description: "Insert text into the current email body at the cursor position in Outlook",
     parameters: z.object({
